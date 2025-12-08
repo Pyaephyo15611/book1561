@@ -1,0 +1,570 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import axios from 'axios';
+import {
+  BookOpen,
+  Search,
+  Star,
+  ChevronRight
+} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
+import CategorySection from '../components/CategorySection';
+import BlogSection from '../components/BlogSection';
+import './Home.css';
+
+// Ensure API_URL is always valid
+const getApiUrl = () => {
+  const envUrl = process.env.REACT_APP_API_URL;
+  if (envUrl && envUrl.trim()) {
+    // If it starts with :, it's just a port, prepend localhost
+    if (envUrl.startsWith(':')) {
+      return `http://localhost${envUrl}`;
+    }
+    // If it doesn't start with http:// or https://, add http://
+    if (!envUrl.startsWith('http://') && !envUrl.startsWith('https://')) {
+      return `http://${envUrl}`;
+    }
+    return envUrl;
+  }
+  return 'http://localhost:5000';
+};
+
+const API_URL = getApiUrl();
+console.log('API_URL configured as:', API_URL);
+
+const Home = () => {
+  const navigate = useNavigate();
+  const [books, setBooks] = useState([]);
+  const [filteredBooks, setFilteredBooks] = useState([]);
+  const [blogs, setBlogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [booksPerPage, setBooksPerPage] = useState(8);
+  const newsBooksScrollRef = useRef(null);
+  const allBooksGridRef = useRef(null);
+
+  useEffect(() => {
+    fetchBooks();
+    fetchBlogs();
+
+    const handleFocus = () => {
+      fetchBooks();
+      fetchBlogs();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
+  // Calculate books per page based on grid columns (2 rows)
+  useEffect(() => {
+    const calculateBooksPerPage = () => {
+      if (allBooksGridRef.current) {
+        const grid = allBooksGridRef.current;
+        const gridWidth = grid.offsetWidth;
+
+        // Desktop: force 6 columns => 12 books (2 rows)
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+          setBooksPerPage(12);
+          return;
+        }
+
+        // Below desktop: auto-calc based on min column width
+        const minColumnWidth = 160; // minmax(160px, 1fr) from CSS
+        const gap = 28; // 1.75rem = 28px
+
+        const availableWidth = gridWidth;
+        const columns = Math.floor((availableWidth + gap) / (minColumnWidth + gap));
+        const booksPerRow = Math.max(2, columns); // minimum 2 columns
+        setBooksPerPage(booksPerRow * 2);
+      }
+    };
+
+    // Calculate after a short delay to ensure DOM is ready
+    const timeoutId = setTimeout(calculateBooksPerPage, 100);
+    window.addEventListener('resize', calculateBooksPerPage);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', calculateBooksPerPage);
+    };
+  }, [filteredBooks]);
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setFilteredBooks(books);
+      setCurrentPage(1);
+      return;
+    }
+
+    const term = searchTerm.toLowerCase();
+    const filtered = books.filter((book) =>
+      book.title?.toLowerCase().includes(term) ||
+      book.author?.toLowerCase().includes(term) ||
+      book.description?.toLowerCase().includes(term) ||
+      book.category?.toLowerCase().includes(term)
+    );
+    setFilteredBooks(filtered);
+    setCurrentPage(1);
+  }, [searchTerm, books]);
+
+  const fetchBooks = async () => {
+    try {
+      let booksData = [];
+
+      // Try API first
+      try {
+        const response = await axios.get(`${API_URL}/api/books`);
+        booksData = response.data;
+      } catch (apiError) {
+        console.log('API not available, trying Firestore directly');
+        const booksSnapshot = await getDocs(collection(db, 'books'));
+        booksSnapshot.forEach((doc) => {
+          booksData.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+      }
+
+      if (booksData.length === 0) {
+        console.warn('No books found');
+      }
+
+      const enhancedBooks = booksData.map((book) => ({
+        ...book,
+        rating: book.rating || (Math.random() * 2 + 3).toFixed(1),
+        pages: book.pages || book.pageCount || Math.floor(Math.random() * 200) + 150,
+        readingTime: book.readingTime || `${Math.floor((book.pages || 200) / 2)} min read`
+      }));
+
+      setBooks(enhancedBooks);
+      setFilteredBooks(enhancedBooks);
+    } catch (error) {
+      console.error('Error fetching books:', error);
+      setBooks([]);
+      setFilteredBooks([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBlogs = async () => {
+    try {
+      // Try API first
+      try {
+        const response = await axios.get(`${API_URL}/api/blogs`);
+        console.log('Blogs fetched from API:', response.data?.length || 0);
+        setBlogs(response.data || []);
+      } catch (apiError) {
+        console.log('API not available, trying Firestore directly', apiError.message);
+        try {
+          const blogsSnapshot = await getDocs(collection(db, 'blogs'));
+          const blogsData = [];
+          blogsSnapshot.forEach((doc) => {
+            blogsData.push({
+              id: doc.id,
+              ...doc.data()
+            });
+          });
+          console.log('Blogs fetched from Firestore:', blogsData.length);
+          setBlogs(blogsData);
+        } catch (firestoreError) {
+          console.error('Firestore error:', firestoreError);
+          setBlogs([]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching blogs:', error);
+      setBlogs([]);
+    }
+  };
+
+  const displayBooks = filteredBooks.length > 0 ? filteredBooks : books;
+  const trendingBooks = (filteredBooks.length > 0 ? filteredBooks : books).filter(
+    (book) => book.isTrending
+  );
+
+  // Category mapping function to match books to categories
+  const matchBookToCategory = (book, categoryKeywords) => {
+    const bookCategory = (book.category || '').toLowerCase();
+    return categoryKeywords.some(keyword => bookCategory.includes(keyword.toLowerCase()));
+  };
+
+  // Category definitions with keywords
+  const categorySections = [
+    {
+      title: 'ရသစာပေများ',
+      keywords: ['literature', 'arts', 'ရသစာပေ', 'fiction', 'novel', 'story'],
+      route: 'ရသစာပေများ'
+    },
+    {
+      title: 'အောင်မြင်ရေးစာပေများ',
+      keywords: ['success', 'self-help', 'အောင်မြင်ရေး', 'motivation', 'business', 'achievement'],
+      route: 'အောင်မြင်ရေးစာပေများ'
+    },
+    {
+      title: 'ရုပ်ပြစာအုပ်များ',
+      keywords: ['comic', 'ရုပ်ပြ', 'graphic', 'manga', 'cartoon'],
+      route: 'ရုပ်ပြစာအုပ်များ'
+    },
+    {
+      title: 'ဝတ္ထုတိုများ',
+      keywords: ['short story', 'ဝတ္ထုတို', 'short', 'story collection'],
+      route: 'ဝတ္ထုတိုများ'
+    },
+    {
+      title: 'သုတစာပေများ',
+      keywords: ['non-fiction', 'knowledge', 'သုတ', 'education', 'reference', 'science', 'history'],
+      route: 'သုတစာပေများ'
+    },
+    {
+      title: 'ကဗျာစာအုပ်များ',
+      keywords: ['poetry', 'poem', 'ကဗျာ', 'verse'],
+      route: 'ကဗျာစာအုပ်များ'
+    },
+    {
+      title: 'ဘာသာပြန်စာအုပ်များ',
+      keywords: ['translated', 'ဘာသာပြန်', 'translation'],
+      route: 'ဘာသာပြန်စာအုပ်များ'
+    },
+    {
+      title: 'ဘာသာရေးစာအုပ်များ',
+      keywords: ['religious', 'religion', 'ဘာသာရေး', 'spiritual', 'faith', 'buddhism', 'christian'],
+      route: 'ဘာသာရေးစာအုပ်များ'
+    }
+  ];
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
+  // Structured Data for Homepage
+  const homepageStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "BookStore",
+    "url": siteUrl,
+    "description": "Free online bookstore with thousands of ebooks. Read and download books online.",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": `${siteUrl}/search/{search_term_string}`,
+      "query-input": "required name=search_term_string"
+    }
+  };
+
+  return (
+    <>
+      <Helmet>
+        <title>BookStore - Free Ebooks Online | Read & Download Books</title>
+        <meta name="description" content="Discover thousands of free ebooks and digital books. Read online or download instantly. Browse fiction, non-fiction, literature, and more." />
+        <meta name="keywords" content="free ebooks, online books, digital books, read books online, download books, bookstore, literature, fiction, non-fiction" />
+        <link rel="canonical" href={siteUrl} />
+        
+        {/* Open Graph */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={siteUrl} />
+        <meta property="og:title" content="BookStore - Free Ebooks Online" />
+        <meta property="og:description" content="Discover thousands of free ebooks and digital books. Read online or download instantly." />
+        
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="BookStore - Free Ebooks Online" />
+        <meta name="twitter:description" content="Discover thousands of free ebooks and digital books." />
+        
+        {/* Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify(homepageStructuredData)}
+        </script>
+      </Helmet>
+
+      <div className="home-page">
+        {/* Manybooks-style hero */}
+        <header className="hero">
+        <div className="hero-bg" aria-hidden="true">
+          <div className="hero-overlay"></div>
+        </div>
+        <div className="container">
+          <motion.div
+            className="hero-content"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <h1>Lots of ebooks. 100% free.</h1>
+            <p className="subtitle">
+              Welcome to your friendly neighborhood library. We have more than {displayBooks.length}+ free ebooks waiting to be discovered.
+            </p>
+          </motion.div>
+        </div>
+      </header>
+
+      <main className="main-content">
+        {/* Blog Section */}
+        <BlogSection blogs={blogs} />
+
+        {/* Search bar and quick filters above trending books */}
+        <section className="section search-section">
+          <div className="container">
+            <form
+              className="navbar-search home-search"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (searchTerm.trim()) {
+                  navigate(`/search/${encodeURIComponent(searchTerm.trim())}`);
+                }
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Search by title, author or keyword"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <button type="submit" className="navbar-search-btn">
+                Search
+              </button>
+            </form>
+            <div className="trending-tags">
+              <span>Trending now:</span>
+              <button type="button" onClick={() => navigate('/category/Fantasy')}>Fantasy</button>
+              <button type="button" onClick={() => navigate('/category/Romance')}>Romance</button>
+              <button type="button" onClick={() => navigate('/category/Mystery')}>Mystery</button>
+              <button type="button" onClick={() => navigate('/category/Biography')}>Biography</button>
+            </div>
+          </div>
+        </section>
+
+        {/* News Books Section with horizontal scroll */}
+        <section className="section news-books">
+          <div className="container">
+            <div className="trending-header">
+              <div className="trending-title">
+                <span>NEWS BOOKS</span>
+                <button
+                  type="button"
+                  className="trending-view"
+                  onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
+                >
+                  (view all)
+                </button>
+              </div>
+              <div className="trending-nav">
+                <button 
+                  className="trend-arrow" 
+                  type="button" 
+                  aria-label="Scroll left"
+                  onClick={() => {
+                    if (newsBooksScrollRef.current) {
+                      newsBooksScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
+                    }
+                  }}
+                >
+                  ‹
+                </button>
+                  <button
+                  className="trend-arrow" 
+                    type="button"
+                  aria-label="Scroll right"
+                  onClick={() => {
+                    if (newsBooksScrollRef.current) {
+                      newsBooksScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+                    }
+                  }}
+                  >
+                  ›
+                  </button>
+              </div>
+            </div>
+
+            {displayBooks.length === 0 ? (
+              <div className="no-results">
+                <BookOpen size={48} />
+                <h3>No books found</h3>
+                <p>Try a different search term or clear the search box.</p>
+              </div>
+            ) : (
+              <div className="news-books-scroll" ref={newsBooksScrollRef}>
+                <div className="news-books-container">
+                  {displayBooks.slice(0, 12).map((book, index) => (
+                    <motion.div
+                      key={book.id || index}
+                      className="news-book-card"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => navigate(`/book/${book.id}`)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="trending-cover">
+                        <img
+                          src={getCoverImageUrl(book)}
+                          alt={book.title}
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = getDefaultCoverImage(book);
+                          }}
+                          loading="lazy"
+                        />
+                      </div>
+                      <p className="trending-book-title">{book.title || 'Untitled'}</p>
+                      <p className="trending-book-author">{book.author || 'Unknown Author'}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Trending strip */}
+        <section className="section trending-books">
+          <div className="container">
+            <div className="trending-header">
+              <div className="trending-title">
+                <span>TRENDING BOOKS</span>
+                <button
+                  type="button"
+                  className="trending-view"
+                  onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
+                >
+                  (view all)
+                </button>
+              </div>
+              <div className="trending-nav">
+                <button className="trend-arrow" type="button" aria-label="Scroll left">
+                  ‹
+                </button>
+                <button className="trend-arrow" type="button" aria-label="Scroll right">
+                  ›
+              </button>
+              </div>
+            </div>
+
+            {(trendingBooks.length === 0 && displayBooks.length === 0) ? (
+              <div className="no-results">
+                <BookOpen size={48} />
+                <h3>No books found</h3>
+                <p>Try a different search term or clear the search box.</p>
+              </div>
+            ) : (
+              <div className="trending-grid">
+                {(trendingBooks.length > 0 ? trendingBooks : displayBooks).slice(0, 8).map((book, index) => (
+                  <motion.div
+                    key={book.id || index}
+                    className="trending-card"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => navigate(`/book/${book.id}`)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="trending-cover">
+                      <img
+                        src={getCoverImageUrl(book)}
+                        alt={book.title}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = getDefaultCoverImage(book);
+                        }}
+                      />
+                    </div>
+                    <p className="trending-book-title">{book.title || 'Untitled'}</p>
+                    <p className="trending-book-author">{book.author || 'Unknown Author'}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Category Sections - Always show all sections */}
+        {!searchTerm && (
+          <>
+            {categorySections.map((category) => {
+              const categoryBooks = displayBooks.filter(book => 
+                matchBookToCategory(book, category.keywords)
+              );
+              
+              return (
+                <CategorySection
+                  key={category.title}
+                  title={category.title}
+                  books={categoryBooks}
+                  categoryRoute={category.route}
+                />
+              );
+            })}
+          </>
+        )}
+
+      </main>
+
+      {/* Footer with Myanmar Language Navigation */}
+      <footer className="footer">
+        <div className="container">
+          <div className="footer-content">
+            <div className="footer-section">
+              <h3>ဆက်သွယ်ရန်</h3>
+              <ul className="footer-links">
+                <li><button className="footer-link" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>ပင်မစာမျက်နှာ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/')}>စာအုပ်များ</button></li>
+                <li><button className="footer-link" onClick={() => window.scrollTo({top: document.querySelector('.news-books')?.offsetTop - 100, behavior: 'smooth'})}>စာအုပ်အသစ်များ</button></li>
+                <li><button className="footer-link" onClick={() => window.scrollTo({top: document.querySelector('.trending-books')?.offsetTop - 100, behavior: 'smooth'})}>ရေပန်းစားစာအုပ်များ</button></li>
+              </ul>
+            </div>
+            
+            <div className="footer-section">
+              <h3>စာအုပ်အမျိုးအစားများ</h3>
+              <ul className="footer-links">
+                <li><button className="footer-link" onClick={() => navigate('/category/ရသစာပေများ')}>ရသစာပေများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/အောင်မြင်ရေးစာပေများ')}>အောင်မြင်ရေးစာပေများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ရုပ်ပြစာအုပ်များ')}>ရုပ်ပြစာအုပ်များ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ဝတ္ထုတိုများ')}>ဝတ္ထုတိုများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/သုတစာပေများ')}>သုတစာပေများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ကဗျာစာအုပ်များ')}>ကဗျာစာအုပ်များ</button></li>
+              </ul>
+            </div>
+            
+            <div className="footer-section">
+              <h3>အကြောင်းအရာ</h3>
+              <ul className="footer-links">
+                <li><button className="footer-link" onClick={() => navigate('/')}>ကျွန်ုပ်တို့အကြောင်း</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/')}>ဆက်သွယ်ရန်</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/')}>မူဝါဒများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/')}>ကိုယ်ရေးလုံခြုံမှု</button></li>
+              </ul>
+            </div>
+            
+            <div className="footer-section">
+              <h3>အခြားသော</h3>
+              <ul className="footer-links">
+                <li><button className="footer-link" onClick={() => navigate('/')}>အကူအညီ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/')}>မေးခွန်းများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/')}>သတင်းစကား</button></li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="footer-bottom">
+            <p>&copy; {new Date().getFullYear()} BookStore. မူပိုင်ခွင့်အားလုံး လုံခြုံပါသည်။</p>
+          </div>
+        </div>
+      </footer>
+    </div>
+    </>
+  );
+};
+
+export default Home;
+

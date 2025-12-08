@@ -1,0 +1,171 @@
+/* Top navigation bar styled similar to ManyBooks header */
+.navbar {
+  position: relative;
+  background: linear-gradient(90deg, #ff6b6b 0%, #ff8e72 40%, #ff6fb1 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.navbar-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.navbar-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-decoration: none;
+}
+
+.navbar-logo span {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.navbar-search {
+  flex: 1;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  margin: 0 1rem;
+  background-color: transparent;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
+}
+
+.navbar-search input {
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: transparent;
+  color: #ffffff;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.75rem;
+  outline: none;
+  border-right: none;
+}
+
+.navbar-search input::placeholder {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.navbar-search-btn {
+  min-width: 3.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #10b981;
+  background-color: #10b981;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.55rem 0.75rem;
+}
+
+.navbar-search-btn:hover {
+  background-color: #059669;
+  transform: translateY(-1px);
+}
+
+.navbar-menu {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.navbar-link {
+  color: #ffece8;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.navbar-link:hover {
+  color: #ffffff;
+}
+
+.navbar-user {
+  font-size: 0.9rem;
+  margin-right: 0.5rem;
+}
+
+.navbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: transparent;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.navbar-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.mobile-menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .navbar-container {
+    height: auto;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .navbar-search {
+    order: 3;              /* ensure search is always on its own row, below logo + menu */
+    width: 100%;
+    max-width: none;
+    margin: 0.5rem 0 0.25rem;
+    flex-basis: 100%;
+  }
+
+  .mobile-menu-toggle {
+    display: inline-flex;
+    order: 2;              /* logo first, then menu button on same top row */
+  }
+
+  .navbar-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    padding: 0.75rem 1.5rem 1rem;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.8));
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+    display: none;
+  }
+
+  .navbar-menu.open {
+    display: flex;
+  }
+}
+
+

@@ -1,0 +1,30 @@
+{
+  "name": "bookstore",
+  "version": "1.0.0",
+  "description": "Online bookstore with PDF reading and download capabilities",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && nodemon index.js",
+    "client": "cd client && npm start",
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "keywords": [
+    "bookstore",
+    "pdf",
+    "react",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.940.0",
+    "@aws-sdk/s3-request-presigner": "^3.940.0",
+    "@mui/icons-material": "^7.3.5",
+    "aws-sdk": "^2.1692.0",
+    "pdf-lib": "^1.17.1"
+  }
+}
