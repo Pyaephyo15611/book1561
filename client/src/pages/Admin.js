@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Upload, BookOpen, Lock, FileText } from 'lucide-react';
 import './Admin.css';
 
@@ -104,8 +103,6 @@ const Admin = () => {
     
     return { score: Math.min(score, 100), feedback };
   };
-
-  const navigate = useNavigate();
 
   const handleLogin = (e) => {
     e.preventDefault();

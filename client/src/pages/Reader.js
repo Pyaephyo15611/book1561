@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -33,19 +33,7 @@ const Reader = () => {
   const [pdfParts, setPdfParts] = useState([]);
   const [currentPart, setCurrentPart] = useState(1);
 
-  useEffect(() => {
-    fetchBookAndPdf();
-  }, [id]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setViewportWidth(window.innerWidth);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const fetchBookAndPdf = async () => {
+  const fetchBookAndPdf = useCallback(async () => {
     try {
       // Try API first – fetch book metadata and PDF view URL in parallel
       try {
@@ -93,7 +81,19 @@ const Reader = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchBookAndPdf();
+  }, [fetchBookAndPdf]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages);
@@ -286,7 +286,7 @@ const Reader = () => {
                           type="button"
                           className="reader-arrow reader-arrow-left"
                           onClick={goToPrevPage}
-                          disabled={!isSplit && currentPage <= 1 || (isSplit && currentPage <= 1 && currentPart <= 1)}
+                          disabled={(!isSplit && currentPage <= 1) || (isSplit && currentPage <= 1 && currentPart <= 1)}
                           aria-label="Previous page"
                         >
                           ‹
@@ -295,7 +295,7 @@ const Reader = () => {
                           type="button"
                           className="reader-arrow reader-arrow-right"
                           onClick={goToNextPage}
-                          disabled={!isSplit && currentPage >= numPages || (isSplit && currentPage >= numPages && currentPart >= pdfParts.length)}
+                          disabled={(!isSplit && currentPage >= numPages) || (isSplit && currentPage >= numPages && currentPart >= pdfParts.length)}
                           aria-label="Next page"
                         >
                           ›

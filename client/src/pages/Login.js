@@ -9,7 +9,7 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, Mail, Lock, User, Eye, EyeOff, Loader } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader } from 'lucide-react';
 import './Login.css';
 
 const Login = () => {

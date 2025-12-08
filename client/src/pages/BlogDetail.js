@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -40,12 +40,7 @@ const BlogDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchBlog();
-    fetchRelatedBlogs();
-  }, [id]);
-
-  const fetchBlog = async () => {
+  const fetchBlog = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -71,9 +66,9 @@ const BlogDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchRelatedBlogs = async () => {
+  const fetchRelatedBlogs = useCallback(async () => {
     try {
       // Try API first
       try {
@@ -104,7 +99,12 @@ const BlogDetail = () => {
       console.error('Error fetching related blogs:', error);
       setRelatedBlogs([]);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchBlog();
+    fetchRelatedBlogs();
+  }, [fetchBlog, fetchRelatedBlogs]);
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   doc,
@@ -8,17 +8,14 @@ import {
   query,
   where,
   onSnapshot,
-  serverTimestamp,
-  getDocs,
-  limit
+  serverTimestamp
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { pdfjs } from 'react-pdf';
 import axios from 'axios';
 import {
   ArrowLeft,
   Download,
-  BookOpen,
   Loader,
   Star,
   Info,
@@ -40,11 +37,9 @@ const BookDetail = () => {
   const [loading, setLoading] = useState(true);
   const [recommendedBooks, setRecommendedBooks] = useState([]);
   const [recommendLoading, setRecommendLoading] = useState(true);
-  const [pdfUrl, setPdfUrl] = useState(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadingPart, setDownloadingPart] = useState(null);
   const [pdfParts, setPdfParts] = useState([]);
-  const [scale, setScale] = useState(1.0);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [newReview, setNewReview] = useState('');
@@ -56,9 +51,75 @@ const BookDetail = () => {
   const [submittingReply, setSubmittingReply] = useState({});
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
 
+  const fetchRecommendedBooks = useCallback(async () => {
+    try {
+      setRecommendLoading(true);
+      const response = await axios.get(`${API_URL}/api/books`);
+      const books = response.data || [];
+      const filtered = books.filter((b) => b.id !== id).slice(0, 6);
+      setRecommendedBooks(filtered);
+    } catch (error) {
+      console.error('Failed to load recommended books', error);
+      setRecommendedBooks([]);
+    } finally {
+      setRecommendLoading(false);
+    }
+  }, [id]);
+
+  const fetchBook = useCallback(async () => {
+    try {
+      // Try API first
+      try {
+        const response = await axios.get(`${API_URL}/api/books/${id}`);
+        console.log('Book data received:', response.data);
+        console.log('Cover image URL:', response.data.coverImage);
+        setBook(response.data);
+        
+        // Get PDF view URL
+        const viewResponse = await axios.get(`${API_URL}/api/books/${id}/view`);
+        const viewUrl = viewResponse.data.viewUrl;
+        console.log('PDF view URL:', viewUrl);
+        
+        // Check if book has parts
+        if (viewResponse.data.isSplit && viewResponse.data.parts) {
+          setPdfParts(viewResponse.data.parts);
+        } else if (response.data.pdfParts && response.data.pdfParts.length > 0) {
+          setPdfParts(response.data.pdfParts);
+        }
+    } catch (apiError) {
+      // Fallback to Firestore
+      const bookRef = doc(db, 'books', id);
+      const bookSnap = await getDoc(bookRef);
+      if (bookSnap.exists()) {
+        const bookData = { id: bookSnap.id, ...bookSnap.data() };
+        setBook(bookData);
+        
+        // Check if book has parts in Firestore
+        if (bookData.pdfParts && bookData.pdfParts.length > 0) {
+          setPdfParts(bookData.pdfParts);
+        }
+        
+        // Construct PDF URL from Backblaze
+        const fileName = bookData.b2FileName || bookData.fileName;
+        if (fileName) {
+          const bucketId = process.env.REACT_APP_B2_BUCKET_ID;
+          const region = process.env.REACT_APP_B2_REGION || 'us-west-004';
+          const viewUrl = `https://f${bucketId}.s3.${region}.backblazeb2.com/${fileName}`;
+          console.log('PDF view URL (fallback):', viewUrl);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching book:', error);
+  } finally {
+    setLoading(false);
+    fetchRecommendedBooks();
+  }
+  }, [id, fetchRecommendedBooks]);
+
   useEffect(() => {
     fetchBook();
-  }, [id]);
+  }, [fetchBook]);
 
   useEffect(() => {
     if (!id) return;
@@ -138,73 +199,6 @@ const BookDetail = () => {
 
     return () => unsubscribe();
   }, [id]);
-
-  const fetchBook = async () => {
-      try {
-        // Try API first
-        try {
-          const response = await axios.get(`${API_URL}/api/books/${id}`);
-          console.log('Book data received:', response.data);
-          console.log('Cover image URL:', response.data.coverImage);
-          setBook(response.data);
-          
-          // Get PDF view URL
-          const viewResponse = await axios.get(`${API_URL}/api/books/${id}/view`);
-          const viewUrl = viewResponse.data.viewUrl;
-          console.log('PDF view URL:', viewUrl);
-          setPdfUrl(viewUrl);
-          
-          // Check if book has parts
-          if (viewResponse.data.isSplit && viewResponse.data.parts) {
-            setPdfParts(viewResponse.data.parts);
-          } else if (response.data.pdfParts && response.data.pdfParts.length > 0) {
-            setPdfParts(response.data.pdfParts);
-          }
-      } catch (apiError) {
-        // Fallback to Firestore
-        const bookRef = doc(db, 'books', id);
-        const bookSnap = await getDoc(bookRef);
-        if (bookSnap.exists()) {
-          const bookData = { id: bookSnap.id, ...bookSnap.data() };
-          setBook(bookData);
-          
-          // Check if book has parts in Firestore
-          if (bookData.pdfParts && bookData.pdfParts.length > 0) {
-            setPdfParts(bookData.pdfParts);
-          }
-          
-          // Construct PDF URL from Backblaze
-          const fileName = bookData.b2FileName || bookData.fileName;
-          if (fileName) {
-            const bucketId = process.env.REACT_APP_B2_BUCKET_ID;
-            const region = process.env.REACT_APP_B2_REGION || 'us-west-004';
-            const viewUrl = `https://f${bucketId}.s3.${region}.backblazeb2.com/${fileName}`;
-            setPdfUrl(viewUrl);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching book:', error);
-    } finally {
-      setLoading(false);
-      fetchRecommendedBooks();
-    }
-  };
-
-  const fetchRecommendedBooks = async () => {
-    try {
-      setRecommendLoading(true);
-      const response = await axios.get(`${API_URL}/api/books`);
-      const books = response.data || [];
-      const filtered = books.filter((b) => b.id !== id).slice(0, 6);
-      setRecommendedBooks(filtered);
-    } catch (error) {
-      console.error('Failed to load recommended books', error);
-      setRecommendedBooks([]);
-    } finally {
-      setRecommendLoading(false);
-    }
-  };
 
   // PDF is now handled on /read/:id page
 

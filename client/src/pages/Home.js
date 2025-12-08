@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import axios from 'axios';
 import {
-  BookOpen,
-  Search,
-  Star,
-  ChevronRight
+  BookOpen
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
@@ -43,10 +40,7 @@ const Home = () => {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [booksPerPage, setBooksPerPage] = useState(8);
   const newsBooksScrollRef = useRef(null);
-  const allBooksGridRef = useRef(null);
 
   useEffect(() => {
     fetchBooks();
@@ -61,43 +55,9 @@ const Home = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Calculate books per page based on grid columns (2 rows)
-  useEffect(() => {
-    const calculateBooksPerPage = () => {
-      if (allBooksGridRef.current) {
-        const grid = allBooksGridRef.current;
-        const gridWidth = grid.offsetWidth;
-
-        // Desktop: force 6 columns => 12 books (2 rows)
-        if (window.matchMedia('(min-width: 1024px)').matches) {
-          setBooksPerPage(12);
-          return;
-        }
-
-        // Below desktop: auto-calc based on min column width
-        const minColumnWidth = 160; // minmax(160px, 1fr) from CSS
-        const gap = 28; // 1.75rem = 28px
-
-        const availableWidth = gridWidth;
-        const columns = Math.floor((availableWidth + gap) / (minColumnWidth + gap));
-        const booksPerRow = Math.max(2, columns); // minimum 2 columns
-        setBooksPerPage(booksPerRow * 2);
-      }
-    };
-
-    // Calculate after a short delay to ensure DOM is ready
-    const timeoutId = setTimeout(calculateBooksPerPage, 100);
-    window.addEventListener('resize', calculateBooksPerPage);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('resize', calculateBooksPerPage);
-    };
-  }, [filteredBooks]);
-
   useEffect(() => {
     if (!searchTerm) {
       setFilteredBooks(books);
-      setCurrentPage(1);
       return;
     }
 
@@ -109,7 +69,6 @@ const Home = () => {
       book.category?.toLowerCase().includes(term)
     );
     setFilteredBooks(filtered);
-    setCurrentPage(1);
   }, [searchTerm, books]);
 
   const fetchBooks = async () => {
