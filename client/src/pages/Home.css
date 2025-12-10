@@ -406,6 +406,44 @@ a:hover {
   margin-bottom: 2.5rem;
 }
 
+.category-header {
+  position: relative;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+.category-header .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.category-header .btn {
+  position: absolute;
+  left: 0;
+}
+
+@media (max-width: 640px) {
+  .category-header {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .category-header .btn {
+    position: static;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .category-header .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .section-title {
   font-size: 1.875rem;
   font-weight: 700;
@@ -523,6 +561,34 @@ a:hover {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 1.75rem;
+}
+
+.trending-row-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -1rem;
+  padding: 0 1rem 0.5rem;
+}
+
+.trending-row-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.trending-row-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--gray-300);
+  border-radius: 4px;
+}
+
+.trending-row {
+  display: flex;
+  gap: 1.5rem;
+  width: max-content;
+  padding: 0.25rem 0 0.75rem;
+}
+
+.trending-row .trending-card {
+  flex: 0 0 170px;
 }
 
 .all-books-grid {

@@ -36,14 +36,14 @@ const Category = () => {
       <main className="main-content">
         <section className="section">
           <div className="container">
-            <div className="section-header" style={{ alignItems: 'center', gap: '1rem' }}>
+            <div className="section-header category-header">
+              <button className="btn btn-outline" onClick={() => navigate(-1)}>
+                <ArrowLeft size={18} /> Back
+              </button>
               <div>
                 <span className="section-eyebrow">Category</span>
                 <h2 className="section-title">{decodeURIComponent(name || '')}</h2>
               </div>
-              <button className="btn btn-outline" onClick={() => navigate(-1)}>
-                <ArrowLeft size={18} /> Back
-              </button>
             </div>
 
             {loading ? (

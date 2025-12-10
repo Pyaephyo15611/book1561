@@ -1,10 +1,14 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api/books'; // Update with your backend API URL
+// Prefer env var, fallback to localhost for development
+const baseUrlEnv = process.env.REACT_APP_API_URL;
+const API_URL = baseUrlEnv && baseUrlEnv.trim()
+  ? baseUrlEnv.replace(/\/$/, '') // Remove trailing slash
+  : 'http://localhost:5000';
 
 export const getBookById = async (id) => {
   try {
-    const response = await axios.get(`${API_URL}/${id}`);
+    const response = await axios.get(`${API_URL}/api/books/${id}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching book:', error);
@@ -14,7 +18,7 @@ export const getBookById = async (id) => {
 
 export const getAllBooks = async () => {
   try {
-    const response = await axios.get(API_URL);
+    const response = await axios.get(`${API_URL}/api/books`);
     return response.data;
   } catch (error) {
     console.error('Error fetching books:', error);

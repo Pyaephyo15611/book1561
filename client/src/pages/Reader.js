@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -32,30 +32,54 @@ const Reader = () => {
   const [isSplit, setIsSplit] = useState(false);
   const [pdfParts, setPdfParts] = useState([]);
   const [currentPart, setCurrentPart] = useState(1);
+  const scrollContainerRef = useRef(null);
+  const pageRefs = useRef([]);
+  const scrollFrame = useRef(null);
+
+  const getPartUrl = useCallback(
+    (partsList, partNumber) => {
+      const part = partsList.find((p) => p.partNumber === partNumber);
+      if (!part) return null;
+      // Always go through our API proxy to get proper CORS headers
+      return `${API_URL}/api/books/${id}/pdf/part/${partNumber}`;
+    },
+    [id]
+  );
 
   const fetchBookAndPdf = useCallback(async () => {
     try {
       // Try API first – fetch book metadata and PDF view URL in parallel
       try {
-        const [bookResponse, viewResponse] = await Promise.all([
+        const [bookResponse, viewResponse, cdnResponse] = await Promise.all([
           axios.get(`${API_URL}/api/books/${id}`),
-          axios.get(`${API_URL}/api/books/${id}/view`)
+          axios.get(`${API_URL}/api/books/${id}/view`),
+          axios
+            .get(`${API_URL}/api/books/${id}/cdn`)
+            .catch(() => null) // CDN endpoint is optional
         ]);
 
-        setBook(bookResponse.data);
+        const cdnData = cdnResponse?.data;
+        const enrichedBook = cdnData?.cdnCoverUrl
+          ? { ...bookResponse.data, cdnCoverUrl: cdnData.cdnCoverUrl }
+          : bookResponse.data;
+        setBook(enrichedBook);
         
         // Handle PDF parts
         if (viewResponse.data.isSplit && viewResponse.data.parts) {
           setIsSplit(true);
-          setPdfParts(viewResponse.data.parts);
+          const partsWithCdn =
+            (cdnData?.parts && cdnData.parts.length > 0 ? cdnData.parts : viewResponse.data.parts) ||
+            [];
+          setPdfParts(partsWithCdn);
           setCurrentPart(1);
           // Load first part
-          const firstPartUrl = `${API_URL}/api/books/${id}/pdf/part/1`;
+          const firstPartUrl = getPartUrl(partsWithCdn, 1) || `${API_URL}/api/books/${id}/pdf/part/1`;
           setPdfUrl(firstPartUrl);
         } else {
           setIsSplit(false);
           setPdfParts([]);
-          setPdfUrl(viewResponse.data.viewUrl);
+          // Prefer server proxy to avoid CORS when loading directly from B2/CDN
+          setPdfUrl(viewResponse.data.viewUrl || `${API_URL}/api/books/${id}/pdf`);
         }
       } catch (apiError) {
         console.log('API not available or failed, falling back to Firestore for reader');
@@ -64,16 +88,15 @@ const Reader = () => {
         const bookRef = doc(db, 'books', id);
         const bookSnap = await getDoc(bookRef);
         if (bookSnap.exists()) {
-          const bookData = { id: bookSnap.id, ...bookSnap.data() };
-          setBook(bookData);
+        const bookData = { id: bookSnap.id, ...bookSnap.data() };
+        setBook(bookData);
 
-          const fileName = bookData.b2FileName || bookData.fileName;
-          if (fileName) {
-            const bucketId = process.env.REACT_APP_B2_BUCKET_ID;
-            const region = process.env.REACT_APP_B2_REGION || 'us-west-004';
-            const viewUrl = `https://f${bucketId}.s3.${region}.backblazeb2.com/${fileName}`;
-            setPdfUrl(viewUrl);
-          }
+        const fileName = bookData.b2FileName || bookData.fileName;
+        if (fileName) {
+          // Always prefer the server proxy to avoid CORS when loading directly from B2
+          const proxyUrl = `${API_URL}/api/books/${id}/pdf`;
+          setPdfUrl(proxyUrl);
+        }
         }
       }
     } catch (error) {
@@ -81,7 +104,7 @@ const Reader = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, getPartUrl]);
 
   useEffect(() => {
     fetchBookAndPdf();
@@ -99,6 +122,7 @@ const Reader = () => {
     setNumPages(numPages);
     setPdfLoading(false);
     setCurrentPage(1);
+    pageRefs.current = new Array(numPages);
   };
 
   const onDocumentLoadError = (error) => {
@@ -119,7 +143,7 @@ const Reader = () => {
       // Go to previous part
       const newPart = currentPart - 1;
       setCurrentPart(newPart);
-      setPdfUrl(`${API_URL}/api/books/${id}/pdf/part/${newPart}`);
+      setPdfUrl(getPartUrl(pdfParts, newPart) || `${API_URL}/api/books/${id}/pdf/part/${newPart}`);
       setCurrentPage(1);
       setPdfLoading(true);
     }
@@ -132,7 +156,7 @@ const Reader = () => {
       // Go to next part
       const newPart = currentPart + 1;
       setCurrentPart(newPart);
-      setPdfUrl(`${API_URL}/api/books/${id}/pdf/part/${newPart}`);
+      setPdfUrl(getPartUrl(pdfParts, newPart) || `${API_URL}/api/books/${id}/pdf/part/${newPart}`);
       setCurrentPage(1);
       setPdfLoading(true);
     }
@@ -141,7 +165,7 @@ const Reader = () => {
   const goToPart = (partNumber) => {
     if (partNumber >= 1 && partNumber <= pdfParts.length) {
       setCurrentPart(partNumber);
-      setPdfUrl(`${API_URL}/api/books/${id}/pdf/part/${partNumber}`);
+      setPdfUrl(getPartUrl(pdfParts, partNumber) || `${API_URL}/api/books/${id}/pdf/part/${partNumber}`);
       setCurrentPage(1);
       setPdfLoading(true);
     }
@@ -159,6 +183,44 @@ const Reader = () => {
     if (ratio > 0.6 && currentPage < numPages) goToNextPage();
     else if (ratio < 0.4 && currentPage > 1) goToPrevPage();
   };
+
+  const handleVerticalScroll = useCallback(() => {
+    if (!scrollContainerRef.current || !pageRefs.current.length) return;
+    if (scrollFrame.current) cancelAnimationFrame(scrollFrame.current);
+    scrollFrame.current = requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      const containerCenter = container.scrollTop + container.clientHeight / 2;
+      let closestIndex = 0;
+      let minDistance = Infinity;
+
+      pageRefs.current.forEach((pageEl, index) => {
+        if (!pageEl) return;
+        const pageCenter = pageEl.offsetTop + pageEl.clientHeight / 2;
+        const distance = Math.abs(pageCenter - containerCenter);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestIndex = index;
+        }
+      });
+
+      const visiblePage = closestIndex + 1;
+      setCurrentPage((prev) => (prev === visiblePage ? prev : visiblePage));
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scrollFrame.current) cancelAnimationFrame(scrollFrame.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pdfLoading || !numPages) return;
+    const target = pageRefs.current[currentPage - 1];
+    if (target && scrollContainerRef.current) {
+      target.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'center' });
+    }
+  }, [currentPage, pdfLoading, numPages]);
 
   const isMobile = viewportWidth <= 768;
   const pageWidth = isMobile
@@ -268,15 +330,26 @@ const Reader = () => {
                       className="pdf-document"
                     >
                       {numPages && (
-                        <Page
-                          key={`page_${currentPage}`}
-                          pageNumber={currentPage}
-                          scale={scale}
-                          renderTextLayer={false}
-                          renderAnnotationLayer={false}
-                          className="pdf-page"
-                          width={pageWidth}
-                        />
+                        <div
+                          className="pdf-scroll-column"
+                          ref={scrollContainerRef}
+                          onScroll={handleVerticalScroll}
+                        >
+                          {Array.from({ length: numPages }).map((_, index) => (
+                            <Page
+                              key={`page_${index + 1}`}
+                              pageNumber={index + 1}
+                              scale={scale}
+                              renderTextLayer={false}
+                              renderAnnotationLayer={false}
+                              className="pdf-page"
+                              width={pageWidth}
+                              inputRef={(ref) => {
+                                pageRefs.current[index] = ref;
+                              }}
+                            />
+                          ))}
+                        </div>
                       )}
                     </Document>
 

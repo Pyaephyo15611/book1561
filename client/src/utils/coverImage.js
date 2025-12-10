@@ -30,6 +30,10 @@ export function getCoverImageUrl(book) {
     return null;
   }
 
+  if (book.cdnCoverUrl) {
+    return book.cdnCoverUrl;
+  }
+
   const coverImage = book.coverImage.trim();
   
   // If it's already a full URL (http/https), use it as is

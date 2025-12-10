@@ -69,7 +69,10 @@ const b2 = hasB2Credentials
     })
   : null;
 
+const CDN_URL_TTL_SECONDS = parseInt(process.env.CDN_URL_TTL_SECONDS || '3600', 10);
+
 let b2Authorized = false;
+let b2AuthData = null;
 
 async function ensureB2Authorized() {
   if (!b2) {
@@ -83,12 +86,54 @@ async function ensureB2Authorized() {
         throw new Error('Failed to authorize with Backblaze B2');
       }
       b2Authorized = true;
+      b2AuthData = authResponse.data;
       console.log('✅ B2 authorized successfully');
     } catch (error) {
       console.error('B2 Authorization Error:', error.message || error);
       throw new Error(`B2 authorization failed: ${error.message || 'Check your credentials'}`);
     }
   }
+}
+
+function encodeB2Path(fileName) {
+  return fileName
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+}
+
+function getB2DownloadBaseUrl() {
+  if (b2AuthData?.downloadUrl) return b2AuthData.downloadUrl;
+  if (process.env.B2_BUCKET_ID) return `https://f${process.env.B2_BUCKET_ID}.backblazeb2.com`;
+  return null;
+}
+
+async function getB2CdnUrl(fileName) {
+  if (!hasB2Credentials || !fileName || !process.env.B2_BUCKET_NAME) {
+    return null;
+  }
+
+  await ensureB2Authorized();
+
+  const auth = await b2.getDownloadAuthorization({
+    bucketId: process.env.B2_BUCKET_ID,
+    fileNamePrefix: fileName,
+    validDurationInSeconds: CDN_URL_TTL_SECONDS
+  });
+
+  const token = auth?.data?.authorizationToken;
+  const baseUrl = getB2DownloadBaseUrl();
+
+  if (!token || !baseUrl) {
+    console.warn('⚠️  Unable to build CDN URL - missing token or base URL');
+    return null;
+  }
+
+  const encodedPath = encodeB2Path(fileName);
+  const bucketName = process.env.B2_BUCKET_NAME;
+
+  return `${baseUrl}/file/${bucketName}/${encodedPath}?Authorization=${encodeURIComponent(token)}`;
 }
 
 async function uploadPdfToB2(fileBuffer, fileName, mimeType) {
@@ -238,6 +283,66 @@ app.get('/api/books/:id', async (req, res) => {
   } catch (error) {
     console.error('Error fetching book:', error);
     res.status(500).json({ error: 'Failed to fetch book' });
+  }
+});
+
+// Get signed CDN URLs (Backblaze uses Cloudflare CDN)
+app.get('/api/books/:id/cdn', async (req, res) => {
+  try {
+    const books = await getBooks();
+    const book = books.find((b) => b.id === req.params.id);
+
+    if (!book) {
+      return res.status(404).json({ error: 'Book not found' });
+    }
+
+    if (!hasB2Credentials || !process.env.B2_BUCKET_NAME) {
+      return res.json({
+        cdnPdfUrl: null,
+        cdnCoverUrl: null,
+        parts: [],
+        ttlSeconds: CDN_URL_TTL_SECONDS,
+        message: 'Backblaze B2 credentials are missing; CDN URLs disabled'
+      });
+    }
+
+    const response = {
+      cdnPdfUrl: null,
+      cdnCoverUrl: null,
+      parts: [],
+      ttlSeconds: CDN_URL_TTL_SECONDS
+    };
+
+    // PDF (single file)
+    if (!book.pdfParts || book.pdfParts.length === 0) {
+      const fileName = book.b2FileName || book.fileName;
+      response.cdnPdfUrl = fileName ? await getB2CdnUrl(fileName) : null;
+    } else {
+      // PDF parts
+      const partsWithCdn = [];
+      for (const part of book.pdfParts.sort((a, b) => a.partNumber - b.partNumber)) {
+        const cdnUrl = part.b2FileName ? await getB2CdnUrl(part.b2FileName) : null;
+        partsWithCdn.push({ ...part, cdnUrl });
+      }
+      response.parts = partsWithCdn;
+      response.cdnPdfUrl = partsWithCdn[0]?.cdnUrl || null;
+    }
+
+    // Cover image
+    const coverFileName =
+      book.b2CoverFileName ||
+      (book.coverImage &&
+      !book.coverImage.startsWith('/') &&
+      !book.coverImage.startsWith('http')
+        ? book.coverImage
+        : null);
+
+    response.cdnCoverUrl = coverFileName ? await getB2CdnUrl(coverFileName) : null;
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error building CDN URLs:', error);
+    res.status(500).json({ error: 'Failed to generate CDN URLs', details: error.message });
   }
 });
 

@@ -71,6 +71,8 @@ B2_APPLICATION_KEY=your_application_key
 B2_BUCKET_ID=your_bucket_id
 B2_BUCKET_NAME=your_bucket_name
 B2_REGION=us-west-004
+# Optional: CDN signed URL lifetime (seconds)
+CDN_URL_TTL_SECONDS=3600
 ```
 
 #### Client (.env in `/client` directory)
@@ -139,6 +141,7 @@ bookstore/
 - `GET /api/books` - Get all books
 - `GET /api/books/:id` - Get book by ID
 - `GET /api/books/:id/view` - Get PDF view URL (public)
+- `GET /api/books/:id/cdn` - Get time-limited CDN URLs (Backblaze/Cloudflare)
 - `GET /api/books/:id/download` - Get PDF download URL (requires auth)
 
 ## Features in Detail

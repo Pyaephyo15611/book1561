@@ -9,11 +9,14 @@ const Navbar = ({ user }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
+    const shouldSignOut = window.confirm('Sign out of your account?');
+    if (!shouldSignOut) return;
     try {
       await signOut(auth);
       setMobileMenuOpen(false);
     } catch (error) {
       console.error('Error signing out:', error);
+      alert('Sign out failed. Please try again.');
     }
   };
 

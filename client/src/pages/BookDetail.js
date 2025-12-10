@@ -102,10 +102,9 @@ const BookDetail = () => {
         // Construct PDF URL from Backblaze
         const fileName = bookData.b2FileName || bookData.fileName;
         if (fileName) {
-          const bucketId = process.env.REACT_APP_B2_BUCKET_ID;
-          const region = process.env.REACT_APP_B2_REGION || 'us-west-004';
-          const viewUrl = `https://f${bucketId}.s3.${region}.backblazeb2.com/${fileName}`;
-          console.log('PDF view URL (fallback):', viewUrl);
+          // Use server proxy to avoid CORS when hitting Backblaze directly
+          const viewUrl = `${API_URL}/api/books/${id}/pdf`;
+          console.log('PDF view URL (fallback via proxy):', viewUrl);
         }
       }
     }
@@ -120,6 +119,11 @@ const BookDetail = () => {
   useEffect(() => {
     fetchBook();
   }, [fetchBook]);
+
+  // Ensure each book detail loads scrolled to top (including when navigating from recommendations)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -203,6 +207,9 @@ const BookDetail = () => {
   // PDF is now handled on /read/:id page
 
   const handleDownload = async () => {
+    const shouldDownload = window.confirm('Download this book?');
+    if (!shouldDownload) return;
+
     // If book has parts, don't use the ZIP download - show individual part downloads instead
     if (pdfParts && pdfParts.length > 0) {
       return; // Individual part downloads will be shown in UI
@@ -257,6 +264,9 @@ const BookDetail = () => {
   };
 
   const handleDownloadPart = async (partNumber) => {
+    const shouldDownload = window.confirm(`Download Part ${partNumber}?`);
+    if (!shouldDownload) return;
+
     setDownloadingPart(partNumber);
     try {
       const response = await axios.get(`${API_URL}/api/books/${id}/pdf/part/${partNumber}`, {
@@ -436,7 +446,7 @@ const BookDetail = () => {
       {/* Sticky top navigation like modern online readers */}
       <header className="book-nav">
         <div className="container">
-          <button className="back-btn" onClick={() => navigate(-1)}>
+          <button className="back-btn" onClick={() => navigate('/')}>
             <ArrowLeft size={18} />
             <span>Library</span>
           </button>
