@@ -24,15 +24,10 @@ import {
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import { getCoverImageUrl } from '../utils/coverImage';
+import { API_URL } from '../utils/apiConfig';
 import './BookDetail.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
-// Get API URL and convert HTTP to HTTPS if page is loaded over HTTPS (fixes mixed content error)
-let API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-if (typeof window !== 'undefined' && window.location.protocol === 'https:' && API_URL.startsWith('http://')) {
-  API_URL = API_URL.replace('http://', 'https://');
-}
 
 const BookDetail = () => {
   const { id } = useParams();

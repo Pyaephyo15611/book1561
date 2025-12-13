@@ -1,13 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { API_URL } from '../utils/apiConfig';
 import './BlogSection.css';
-
-// Get API URL and convert HTTP to HTTPS if page is loaded over HTTPS (fixes mixed content error)
-let API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-if (typeof window !== 'undefined' && window.location.protocol === 'https:' && API_URL.startsWith('http://')) {
-  API_URL = API_URL.replace('http://', 'https://');
-}
 
 // Helper function to get blog image URL
 const getBlogImageUrl = (blog) => {

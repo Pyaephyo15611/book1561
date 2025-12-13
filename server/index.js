@@ -13,6 +13,24 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust proxy (needed for Render/Heroku/etc to get correct protocol)
+app.set('trust proxy', true);
+
+// Helper function to get the correct protocol (force HTTPS in production)
+const getProtocol = (req) => {
+  // Check X-Forwarded-Proto header first (set by proxies/load balancers)
+  const forwardedProto = req.get('x-forwarded-proto');
+  if (forwardedProto === 'https') {
+    return 'https';
+  }
+  // In production (Render), force HTTPS
+  if (process.env.NODE_ENV === 'production' || process.env.RENDER) {
+    return 'https';
+  }
+  // Otherwise use the request protocol
+  return req.protocol;
+};
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -239,14 +257,15 @@ app.get('/api/books', async (req, res) => {
   try {
     const books = await getBooks();
     // Transform cover image URLs to use proxy endpoints for B2 images
+    const protocol = getProtocol(req);
     const booksWithUrls = books.map(book => {
       const bookResponse = { ...book };
       if (book.b2CoverFileName || (book.coverImage && !book.coverImage.startsWith('/') && !book.coverImage.startsWith('http'))) {
         // It's a B2 filename, use proxy endpoint
-        bookResponse.coverImage = `${req.protocol}://${req.get('host')}/api/books/${book.id}/cover`;
+        bookResponse.coverImage = `${protocol}://${req.get('host')}/api/books/${book.id}/cover`;
       } else if (book.coverImage && book.coverImage.startsWith('/uploads')) {
         // Local file, use direct URL
-        bookResponse.coverImage = `${req.protocol}://${req.get('host')}${book.coverImage}`;
+        bookResponse.coverImage = `${protocol}://${req.get('host')}${book.coverImage}`;
       }
       // If coverImage is already a full URL (http/https), keep it as is
       return bookResponse;
@@ -269,13 +288,14 @@ app.get('/api/books/:id', async (req, res) => {
     }
     
     // Transform cover image URL to use proxy endpoint if it's from B2
+    const protocol = getProtocol(req);
     const bookResponse = { ...book };
     if (book.b2CoverFileName || (book.coverImage && !book.coverImage.startsWith('/') && !book.coverImage.startsWith('http'))) {
       // It's a B2 filename, use proxy endpoint
-      bookResponse.coverImage = `${req.protocol}://${req.get('host')}/api/books/${req.params.id}/cover`;
+      bookResponse.coverImage = `${protocol}://${req.get('host')}/api/books/${req.params.id}/cover`;
     } else if (book.coverImage && book.coverImage.startsWith('/uploads')) {
       // Local file, use direct URL
-      bookResponse.coverImage = `${req.protocol}://${req.get('host')}${book.coverImage}`;
+      bookResponse.coverImage = `${protocol}://${req.get('host')}${book.coverImage}`;
     }
     // If coverImage is already a full URL (http/https), keep it as is
     
@@ -961,7 +981,8 @@ app.get('/api/books/:id/view', async (req, res) => {
     
     // Handle PDF parts - return first part
     if (book.pdfParts && book.pdfParts.length > 0) {
-      const proxyUrl = `${req.protocol}://${req.get('host')}/api/books/${req.params.id}/pdf/part/1`;
+      const protocol = getProtocol(req);
+      const proxyUrl = `${protocol}://${req.get('host')}/api/books/${req.params.id}/pdf/part/1`;
       return res.json({ 
         viewUrl: proxyUrl,
         isSplit: true,
@@ -979,13 +1000,15 @@ app.get('/api/books/:id/view', async (req, res) => {
     // If the book is stored in Backblaze, use our proxy PDF endpoint
     // so we can add CORS headers and avoid browser CORS errors.
     if (fileName) {
-      const proxyUrl = `${req.protocol}://${req.get('host')}/api/books/${req.params.id}/pdf`;
+      const protocol = getProtocol(req);
+      const proxyUrl = `${protocol}://${req.get('host')}/api/books/${req.params.id}/pdf`;
       return res.json({ viewUrl: proxyUrl, isSplit: false });
     }
 
     // Fallback: locally stored PDF on disk (pdfFilePath)
     if (book.pdfFilePath) {
-      const directUrl = `${req.protocol}://${req.get('host')}${book.pdfFilePath}`;
+      const protocol = getProtocol(req);
+      const directUrl = `${protocol}://${req.get('host')}${book.pdfFilePath}`;
       return res.json({ viewUrl: directUrl, isSplit: false });
     }
 

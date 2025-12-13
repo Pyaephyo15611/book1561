@@ -11,36 +11,9 @@ import { motion } from 'framer-motion';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import CategorySection from '../components/CategorySection';
 import BlogSection from '../components/BlogSection';
+import { API_URL } from '../utils/apiConfig';
 import './Home.css';
 
-// Ensure API_URL is always valid
-const getApiUrl = () => {
-  const envUrl = process.env.REACT_APP_API_URL;
-  let apiUrl;
-  if (envUrl && envUrl.trim()) {
-    // If it starts with :, it's just a port, prepend localhost
-    if (envUrl.startsWith(':')) {
-      apiUrl = `http://localhost${envUrl}`;
-    }
-    // If it doesn't start with http:// or https://, add http://
-    else if (!envUrl.startsWith('http://') && !envUrl.startsWith('https://')) {
-      apiUrl = `http://${envUrl}`;
-    } else {
-      apiUrl = envUrl;
-    }
-  } else {
-    apiUrl = 'http://localhost:5000';
-  }
-  
-  // Convert HTTP to HTTPS if page is loaded over HTTPS (fixes mixed content error)
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && apiUrl.startsWith('http://')) {
-    apiUrl = apiUrl.replace('http://', 'https://');
-  }
-  
-  return apiUrl;
-};
-
-const API_URL = getApiUrl();
 console.log('API_URL configured as:', API_URL);
 
 const Home = () => {

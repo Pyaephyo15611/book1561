@@ -3,13 +3,8 @@ import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BookOpen, ArrowLeft } from 'lucide-react';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
+import { API_URL } from '../utils/apiConfig';
 import './Home.css';
-
-// Get API URL and convert HTTP to HTTPS if page is loaded over HTTPS (fixes mixed content error)
-let API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-if (typeof window !== 'undefined' && window.location.protocol === 'https:' && API_URL.startsWith('http://')) {
-  API_URL = API_URL.replace('http://', 'https://');
-}
 
 const Search = () => {
   const { term } = useParams();
