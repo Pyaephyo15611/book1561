@@ -1,4 +1,8 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Get API URL and convert HTTP to HTTPS if page is loaded over HTTPS (fixes mixed content error)
+let API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+if (typeof window !== 'undefined' && window.location.protocol === 'https:' && API_URL.startsWith('http://')) {
+  API_URL = API_URL.replace('http://', 'https://');
+}
 
 // Generate a default cover image URL for books without covers
 export function getDefaultCoverImage(book) {

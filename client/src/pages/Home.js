@@ -16,18 +16,28 @@ import './Home.css';
 // Ensure API_URL is always valid
 const getApiUrl = () => {
   const envUrl = process.env.REACT_APP_API_URL;
+  let apiUrl;
   if (envUrl && envUrl.trim()) {
     // If it starts with :, it's just a port, prepend localhost
     if (envUrl.startsWith(':')) {
-      return `http://localhost${envUrl}`;
+      apiUrl = `http://localhost${envUrl}`;
     }
     // If it doesn't start with http:// or https://, add http://
-    if (!envUrl.startsWith('http://') && !envUrl.startsWith('https://')) {
-      return `http://${envUrl}`;
+    else if (!envUrl.startsWith('http://') && !envUrl.startsWith('https://')) {
+      apiUrl = `http://${envUrl}`;
+    } else {
+      apiUrl = envUrl;
     }
-    return envUrl;
+  } else {
+    apiUrl = 'http://localhost:5000';
   }
-  return 'http://localhost:5000';
+  
+  // Convert HTTP to HTTPS if page is loaded over HTTPS (fixes mixed content error)
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && apiUrl.startsWith('http://')) {
+    apiUrl = apiUrl.replace('http://', 'https://');
+  }
+  
+  return apiUrl;
 };
 
 const API_URL = getApiUrl();
