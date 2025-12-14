@@ -4,7 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { Document, Page, pdfjs } from 'react-pdf';
 import axios from 'axios';
-import { ArrowLeft, Loader, BookOpen } from 'lucide-react';
+import { ArrowLeft,  BookOpen } from 'lucide-react';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import './BookDetail.css';

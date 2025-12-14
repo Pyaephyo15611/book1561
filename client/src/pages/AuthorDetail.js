@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BookOpen, ArrowLeft, User } from 'lucide-react';
+import { BookOpen, ArrowLeft } from 'lucide-react';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import { API_URL } from '../utils/apiConfig';
 import './Home.css';
