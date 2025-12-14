@@ -12,6 +12,8 @@ import Login from './pages/Login';
 import Admin from './pages/Admin';
 import Category from './pages/Category';
 import Search from './pages/Search';
+import AuthorList from './pages/AuthorList';
+import AuthorDetail from './pages/AuthorDetail';
 import './App.css';
 
 function App() {
@@ -58,7 +60,7 @@ function App() {
   if (loading) {
     return (
       <div className="loading-container">
-        <div className="spinner"></div>
+        <div className="loader"></div>
       </div>
     );
   }
@@ -83,6 +85,8 @@ function App() {
           <Route path="/admin" element={<Admin user={user} />} />
           <Route path="/category/:name" element={<Category />} />
           <Route path="/search/:term" element={<Search />} />
+          <Route path="/authors" element={<AuthorList />} />
+          <Route path="/author/:name" element={<AuthorDetail />} />
         </Routes>
       </div>
     </Router>

@@ -323,7 +323,7 @@ const Home = () => {
   if (loading) {
     return (
       <div className="loading-container">
-        <div className="spinner"></div>
+        <div className="loader"></div>
         <p>Loading your books...</p>
       </div>
     );

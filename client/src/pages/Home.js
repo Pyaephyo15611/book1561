@@ -13,6 +13,7 @@ import CategorySection from '../components/CategorySection';
 import BlogSection from '../components/BlogSection';
 import { API_URL } from '../utils/apiConfig';
 import './Home.css';
+import logo from '../assets/logo1.png';
 
 console.log('API_URL configured as:', API_URL);
 
@@ -127,9 +128,6 @@ const Home = () => {
   };
 
   const displayBooks = filteredBooks.length > 0 ? filteredBooks : books;
-  const trendingBooks = (filteredBooks.length > 0 ? filteredBooks : books).filter(
-    (book) => book.isTrending
-  );
 
   // Category mapping function to match books to categories
   const matchBookToCategory = (book, categoryKeywords) => {
@@ -184,7 +182,7 @@ const Home = () => {
   if (loading) {
     return (
       <div className="loading-container">
-        <div className="spinner"></div>
+        <div className="loader"></div>
       </div>
     );
   }
@@ -243,6 +241,12 @@ const Home = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
+           <img
+    src={logo}
+    alt="BookStore Logo"
+    className="hero-logo"
+    onClick={() => navigate('/')}
+  />
             <h1>Lots of ebooks. 100% free.</h1>
             <p className="subtitle">
               Welcome to your friendly neighborhood library. We have more than {displayBooks.length}+ free ebooks waiting to be discovered.
@@ -255,7 +259,7 @@ const Home = () => {
         {/* Blog Section */}
         <BlogSection blogs={blogs} />
 
-        {/* Search bar and quick filters above trending books */}
+        {/* Search bar and quick filters */}
         <section className="section search-section">
           <div className="container">
             <form
@@ -369,69 +373,6 @@ const Home = () => {
           </div>
         </section>
 
-        {/* Trending strip */}
-        <section className="section trending-books">
-          <div className="container">
-            <div className="trending-header">
-              <div className="trending-title">
-                <span>TRENDING BOOKS</span>
-                <button
-                  type="button"
-                  className="trending-view"
-                  onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
-                >
-                  (view all)
-                </button>
-              </div>
-              <div className="trending-nav">
-                <button className="trend-arrow" type="button" aria-label="Scroll left">
-                  ‹
-                </button>
-                <button className="trend-arrow" type="button" aria-label="Scroll right">
-                  ›
-              </button>
-              </div>
-            </div>
-
-            {(trendingBooks.length === 0 && displayBooks.length === 0) ? (
-              <div className="no-results">
-                <BookOpen size={48} />
-                <h3>No books found</h3>
-                <p>Try a different search term or clear the search box.</p>
-              </div>
-            ) : (
-              <div className="trending-row-scroll">
-                <div className="trending-row">
-                  {(trendingBooks.length > 0 ? trendingBooks : displayBooks).slice(0, 12).map((book, index) => (
-                    <motion.div
-                      key={book.id || index}
-                      className="trending-card"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => navigate(`/book/${book.id}`)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className="trending-cover">
-                        <img
-                          src={getCoverImageUrl(book)}
-                          alt={book.title}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = getDefaultCoverImage(book);
-                          }}
-                        />
-                      </div>
-                      <p className="trending-book-title">{book.title || 'Untitled'}</p>
-                      <p className="trending-book-author">{book.author || 'Unknown Author'}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
         {/* Category Sections - Always show all sections */}
         {!searchTerm && (
           <>
@@ -464,7 +405,7 @@ const Home = () => {
                 <li><button className="footer-link" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>ပင်မစာမျက်နှာ</button></li>
                 <li><button className="footer-link" onClick={() => navigate('/')}>စာအုပ်များ</button></li>
                 <li><button className="footer-link" onClick={() => window.scrollTo({top: document.querySelector('.news-books')?.offsetTop - 100, behavior: 'smooth'})}>စာအုပ်အသစ်များ</button></li>
-                <li><button className="footer-link" onClick={() => window.scrollTo({top: document.querySelector('.trending-books')?.offsetTop - 100, behavior: 'smooth'})}>ရေပန်းစားစာအုပ်များ</button></li>
+                <li><button className="footer-link" onClick={() => window.scrollTo({top: document.querySelector('.news-books')?.offsetTop - 100, behavior: 'smooth'})}>ရေပန်းစားစာအုပ်များ</button></li>
               </ul>
             </div>
             

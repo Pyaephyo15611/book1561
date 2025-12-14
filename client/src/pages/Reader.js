@@ -230,9 +230,7 @@ const Reader = () => {
     return (
       <div className="loading-container reader-loading-full">
         <div className="reader-loading-card">
-          <div className="reader-spinner">
-            <Loader className="spinning" size={36} />
-          </div>
+          <div className="loader"></div>
           <p>Loading pages…</p>
         </div>
       </div>
@@ -316,7 +314,7 @@ const Reader = () => {
                   <div className="pdf-viewer" onClick={handlePageTap} onTouchStart={handlePageTap}>
                     {pdfLoading && (
                       <div className="pdf-loading">
-                        <Loader className="spinning" size={32} />
+                        <div className="loader"></div>
                         <p>Loading pages…</p>
                       </div>
                     )}

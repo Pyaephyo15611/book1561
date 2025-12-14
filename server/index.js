@@ -197,24 +197,141 @@ function getB2PublicUrl(fileName) {
   return fileName; // Return just the filename, we'll use proxy endpoint
 }
 
-// Helper functions for books JSON file
-async function getBooks() {
+// Helper function to upload books.json to Backblaze B2
+async function uploadBooksJsonToB2(booksData) {
+  if (!hasB2Credentials) {
+    return false;
+  }
+  
   try {
-    const data = await fs.readFile(BOOKS_FILE, 'utf8');
-    return JSON.parse(data);
+    await ensureB2Authorized();
+    const jsonString = JSON.stringify(booksData, null, 2);
+    const jsonBuffer = Buffer.from(jsonString, 'utf8');
+    const fileName = 'data/books.json';
+    
+    const uploadUrlResponse = await b2.getUploadUrl({
+      bucketId: process.env.B2_BUCKET_ID
+    });
+    
+    if (!uploadUrlResponse || !uploadUrlResponse.data) {
+      throw new Error('Failed to get upload URL from Backblaze B2');
+    }
+    
+    const uploadResponse = await b2.uploadFile({
+      uploadUrl: uploadUrlResponse.data.uploadUrl,
+      uploadAuthToken: uploadUrlResponse.data.authorizationToken,
+      fileName: fileName,
+      data: jsonBuffer,
+      mime: 'application/json'
+    });
+    
+    console.log(`✅ Uploaded books.json to Backblaze: ${fileName}`);
+    return true;
   } catch (error) {
-    console.error('Error reading books:', error);
-    return [];
+    console.warn('⚠️  Failed to upload books.json to Backblaze:', error.message);
+    return false;
   }
 }
 
+// Helper function to download books.json from Backblaze B2
+async function downloadBooksJsonFromB2() {
+  if (!hasB2Credentials) {
+    return null;
+  }
+  
+  try {
+    await ensureB2Authorized();
+    const fileName = 'data/books.json';
+    
+    // List files to find books.json and get its fileId
+    const listResponse = await b2.listFileNames({
+      bucketId: process.env.B2_BUCKET_ID,
+      startFileName: fileName,
+      maxFileCount: 10
+    });
+    
+    // Find the exact file
+    const fileInfo = listResponse?.data?.files?.find(
+      file => file.fileName === fileName
+    );
+    
+    if (!fileInfo || !fileInfo.fileId) {
+      return null;
+    }
+    
+    // Download the file using downloadFileById
+    const downloadResponse = await b2.downloadFileById({
+      fileId: fileInfo.fileId
+    });
+    
+    if (!downloadResponse || !downloadResponse.data) {
+      return null;
+    }
+    
+    // Convert buffer to string and parse JSON
+    const jsonString = Buffer.isBuffer(downloadResponse.data) 
+      ? downloadResponse.data.toString('utf8')
+      : downloadResponse.data;
+    const books = JSON.parse(jsonString);
+    console.log(`✅ Downloaded ${books.length} books from Backblaze`);
+    return books;
+  } catch (error) {
+    // File might not exist yet, that's okay
+    if (error.message && (error.message.includes('not found') || error.message.includes('No such file'))) {
+      return null;
+    }
+    console.warn('⚠️  Failed to download books.json from Backblaze:', error.message);
+    return null;
+  }
+}
+
+// Helper functions for books - use Backblaze B2 for persistence
+async function getBooks() {
+  // Try to load from local books.json first
+  let books = [];
+  try {
+    const data = await fs.readFile(BOOKS_FILE, 'utf8');
+    books = JSON.parse(data);
+    if (books.length > 0) {
+      console.log(`📚 Loaded ${books.length} books from local books.json`);
+      return books;
+    }
+  } catch (error) {
+    // File doesn't exist or is empty, try Backblaze
+    console.log('📚 Local books.json not found or empty, trying Backblaze...');
+  }
+  
+  // If local file is empty or doesn't exist, try downloading from Backblaze
+  const booksFromB2 = await downloadBooksJsonFromB2();
+  if (booksFromB2 && booksFromB2.length > 0) {
+    // Save to local file for faster access
+    try {
+      await fs.writeFile(BOOKS_FILE, JSON.stringify(booksFromB2, null, 2));
+      console.log(`✅ Synced ${booksFromB2.length} books from Backblaze to local file`);
+    } catch (err) {
+      console.warn('Could not save to local file:', err.message);
+    }
+    return booksFromB2;
+  }
+  
+  console.log('📚 No books found in local file or Backblaze, starting fresh');
+  return [];
+}
+
 async function saveBooks(books) {
+  // Save to local books.json first
   try {
     await fs.writeFile(BOOKS_FILE, JSON.stringify(books, null, 2));
+    console.log(`✅ Saved ${books.length} books to local books.json`);
   } catch (error) {
-    console.error('Error saving books:', error);
+    console.error('Error saving books.json:', error);
     throw error;
   }
+  
+  // Also upload to Backblaze B2 for persistence (async, don't wait)
+  uploadBooksJsonToB2(books).catch(err => {
+    console.warn('Background upload to Backblaze failed:', err.message);
+  });
 }
 
 // Helper functions for blogs JSON file
@@ -582,7 +699,6 @@ app.put(
 
       books[index] = book;
       await saveBooks(books);
-
       res.json(book);
     } catch (error) {
       console.error('Error updating book:', error);

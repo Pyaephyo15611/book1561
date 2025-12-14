@@ -108,7 +108,7 @@ const BlogDetail = () => {
   if (loading) {
     return (
       <div className="blog-detail-loading">
-        <div className="spinner"></div>
+        <div className="loader"></div>
       </div>
     );
   }

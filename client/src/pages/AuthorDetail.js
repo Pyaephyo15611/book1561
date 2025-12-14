@@ -1,58 +1,57 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BookOpen, ArrowLeft } from 'lucide-react';
+import { BookOpen, ArrowLeft, User } from 'lucide-react';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import { API_URL } from '../utils/apiConfig';
 import './Home.css';
 
-const Search = () => {
-  const { term } = useParams();
+const AuthorDetail = () => {
+  const { name } = useParams();
   const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const authorName = decodeURIComponent(name || '');
 
   useEffect(() => {
     const fetchBooks = async () => {
       try {
         const response = await axios.get(`${API_URL}/api/books`);
-        setBooks(Array.isArray(response.data) ? response.data : []);
+        const allBooks = Array.isArray(response.data) ? response.data : [];
+        
+        // Filter books by author (case-insensitive)
+        const filtered = allBooks.filter(
+          (b) => (b.author || '').trim().toLowerCase() === authorName.toLowerCase()
+        );
+        
+        setBooks(filtered);
       } catch (error) {
         console.error('Error fetching books:', error);
+        setBooks([]);
       } finally {
         setLoading(false);
       }
     };
+    
     fetchBooks();
-  }, []);
-
-  const query = decodeURIComponent(term || '').toLowerCase();
-  const filtered = books.filter((b) => {
-    const title = b.title || '';
-    const author = b.author || '';
-    const description = b.description || '';
-    const category = b.category || '';
-    return (
-      title.toLowerCase().includes(query) ||
-      author.toLowerCase().includes(query) ||
-      description.toLowerCase().includes(query) ||
-      category.toLowerCase().includes(query)
-    );
-  });
+  }, [authorName]);
 
   return (
     <div className="home-page">
       <main className="main-content">
         <section className="section">
           <div className="container">
-            <div className="section-header" style={{ alignItems: 'center', gap: '1rem' }}>
-              <div>
-                <span className="section-eyebrow">Search</span>
-                <h2 className="section-title">“{decodeURIComponent(term || '')}”</h2>
-              </div>
-              <button className="btn btn-outline" onClick={() => navigate(-1)}>
-                <ArrowLeft size={18} /> Back
+            <div className="section-header category-header">
+              <button className="btn btn-outline" onClick={() => navigate('/authors')}>
+                <ArrowLeft size={18} /> Back to Authors
               </button>
+              <div>
+                <span className="section-eyebrow">Author</span>
+                <h2 className="section-title">{authorName}</h2>
+                <p style={{ marginTop: '0.5rem', color: '#6b7280' }}>
+                  {books.length} {books.length === 1 ? 'book' : 'books'} by this author
+                </p>
+              </div>
             </div>
 
             {loading ? (
@@ -60,15 +59,15 @@ const Search = () => {
                 <div className="loader" />
                 <p>Loading books...</p>
               </div>
-            ) : filtered.length === 0 ? (
+            ) : books.length === 0 ? (
               <div className="no-results">
                 <BookOpen size={48} />
                 <h3>No books found</h3>
-                <p>No books match this search.</p>
+                <p>No books by {authorName} yet.</p>
               </div>
             ) : (
               <div className="trending-grid">
-                {filtered.map((book) => (
+                {books.map((book) => (
                   <div
                     key={book.id}
                     className="trending-card"
@@ -98,5 +97,5 @@ const Search = () => {
   );
 };
 
-export default Search;
+export default AuthorDetail;
 

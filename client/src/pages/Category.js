@@ -47,7 +47,7 @@ const Category = () => {
 
             {loading ? (
               <div className="no-results">
-                <div className="spinner" />
+                <div className="loader" />
                 <p>Loading books...</p>
               </div>
             ) : filtered.length === 0 ? (
@@ -76,7 +76,18 @@ const Category = () => {
                       />
                     </div>
                     <p className="trending-book-title">{book.title || 'Untitled'}</p>
-                    <p className="trending-book-author">{book.author || 'Unknown Author'}</p>
+                    <p 
+                      className="trending-book-author"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (book.author) {
+                          navigate(`/author/${encodeURIComponent(book.author)}`);
+                        }
+                      }}
+                      style={{ cursor: book.author ? 'pointer' : 'default' }}
+                    >
+                      {book.author || 'Unknown Author'}
+                    </p>
                   </div>
                 ))}
               </div>

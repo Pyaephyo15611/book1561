@@ -420,7 +420,7 @@ const BookDetail = () => {
   if (loading) {
     return (
       <div className="loading-container">
-        <div className="spinner"></div>
+        <div className="loader"></div>
       </div>
     );
   }
@@ -561,7 +561,25 @@ const BookDetail = () => {
             <div className="book-heading">
               <h1 className="book-title">{book.title || 'Untitled'}</h1>
               <p className="book-author">
-                By {book.author || 'Unknown Author'}
+                By{' '}
+                {book.author ? (
+                  <button
+                    onClick={() => navigate(`/author/${encodeURIComponent(book.author)}`)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      padding: 0,
+                      font: 'inherit'
+                    }}
+                  >
+                    {book.author}
+                  </button>
+                ) : (
+                  'Unknown Author'
+                )}
               </p>
               {/* Dynamic average rating from reviews */}
               <div className="book-rating">

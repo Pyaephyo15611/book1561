@@ -154,5 +154,23 @@
     "b2CoverFileName": "covers/1765095434809-Design-01.png",
     "coverImageUrl": "covers/1765095434809-Design-01.png",
     "createdAt": "2025-12-07T08:17:18.220Z"
+  },
+  {
+    "id": "book_1765701408671_bcjaf6901",
+    "title": "ewfijuweh",
+    "author": "ဂျူး",
+    "description": "မနါနမါတတမ",
+    "category": "ဝတ္ထုတို",
+    "coverImage": "covers/1765701413647-korea_LE_upscale_balanced_x4.jpg",
+    "readingTime": "၄",
+    "rating": 1.7,
+    "isTrending": false,
+    "pdfParts": null,
+    "pdfFilePath": "/uploads/images/1765701408671-a_mhat_ta_ya_juu.pdf",
+    "b2FileName": "pdfs/1765701408671-a_mhat_ta_ya_juu.pdf",
+    "fileName": "pdfs/1765701408671-a_mhat_ta_ya_juu.pdf",
+    "b2CoverFileName": "covers/1765701413647-korea_LE_upscale_balanced_x4.jpg",
+    "coverImageUrl": "covers/1765701413647-korea_LE_upscale_balanced_x4.jpg",
+    "createdAt": "2025-12-14T08:36:56.466Z"
   }
 ]

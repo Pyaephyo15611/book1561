@@ -36,6 +36,9 @@ const Navbar = ({ user }) => {
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
         <div className={`navbar-menu ${mobileMenuOpen ? 'open' : ''}`}>
+          <Link to="/authors" className="navbar-link" onClick={() => setMobileMenuOpen(false)}>
+            Authors
+          </Link>
           <Link to="/admin" className="navbar-link" onClick={() => setMobileMenuOpen(false)}>
             Admin
           </Link>
