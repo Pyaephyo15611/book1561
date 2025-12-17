@@ -21,16 +21,15 @@
 .navbar-logo {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
   color: #ffffff;
-  font-weight: 700;
-  font-size: 1.2rem;
   text-decoration: none;
 }
 
-.navbar-logo span {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+.navbar-logo-img {
+  height: 50px;        /* bigger navbar logo */
+  max-width: 200px;
+  object-fit: contain;
+  display: block;
 }
 
 .navbar-search {
@@ -135,6 +134,10 @@
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
     flex-wrap: wrap;
+  }
+
+  .navbar-logo-img {
+    height: 40px;      /* bigger on mobile */
   }
 
   .navbar-search {

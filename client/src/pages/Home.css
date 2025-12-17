@@ -177,14 +177,16 @@ a:hover {
 .hero-bg {
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=1800&q=80') center/cover no-repeat;
-  filter: brightness(0.5);
+  /* no background image or color behind hero */
+  background: none;
+  filter: none;
 }
 
 .hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, rgba(255, 108, 171, 0.9), rgba(15, 184, 173, 0.6));
+  /* fully transparent: hero uses the global page background only */
+  background: transparent;
 }
 
 .hero .container {
@@ -1254,8 +1256,8 @@ a:hover {
   }
 }
 .hero-logo {
-  width: 140px;        /* adjust size here */
-  max-width: 70%;
+  width: 95px;        /* smaller logo in hero */
+  max-width: 55%;
   margin-bottom: 20px;
   cursor: pointer;
   transition: transform 0.3s ease, opacity 0.3s ease;
@@ -1269,6 +1271,6 @@ a:hover {
 /* Mobile */
 @media (max-width: 768px) {
   .hero-logo {
-    width: 110px;
+    width: 90px;
   }
 }

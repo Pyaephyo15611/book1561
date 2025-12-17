@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { LogOut, BookOpen, Menu, X } from 'lucide-react';
+import { LogOut, Menu, X } from 'lucide-react';
 import './Navbar.css';
+import logo from '../assets/logo3.png';
 
 const Navbar = ({ user }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -28,8 +29,7 @@ const Navbar = ({ user }) => {
     <nav className="navbar">
       <div className="navbar-container">
         <Link to="/" className="navbar-logo" onClick={() => setMobileMenuOpen(false)}>
-          <BookOpen size={24} />
-          <span>BookStore</span>
+          <img src={logo} alt="BookStore logo" className="navbar-logo-img" />
         </Link>
         {/* Search bar moved to Home page above trending section */}
         <button className="mobile-menu-toggle" onClick={toggleMobileMenu} aria-label="Toggle menu">

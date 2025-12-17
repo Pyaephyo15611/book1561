@@ -13,7 +13,7 @@ import CategorySection from '../components/CategorySection';
 import BlogSection from '../components/BlogSection';
 import { API_URL } from '../utils/apiConfig';
 import './Home.css';
-import logo from '../assets/logo1.png';
+import logo from '../assets/logo3.png';
 
 console.log('API_URL configured as:', API_URL);
 
