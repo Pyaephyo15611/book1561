@@ -373,10 +373,24 @@ async function saveBooks(books) {
     throw error;
   }
   
-  // Also upload to Backblaze B2 for persistence (async, don't wait)
-  uploadBooksJsonToB2(books).catch(err => {
-    console.warn('Background upload to Backblaze failed:', err.message);
-  });
+  // Also upload to Backblaze B2 for persistence (WAIT for it to complete)
+  // This is critical for deployed servers where local files are temporary
+  if (hasB2Credentials) {
+    try {
+      const uploaded = await uploadBooksJsonToB2(books);
+      if (!uploaded) {
+        console.error('❌ CRITICAL: Failed to upload books.json to Backblaze. Books will be lost on server restart!');
+        console.error('   Please check your B2 credentials: B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_ID');
+      }
+    } catch (err) {
+      console.error('❌ CRITICAL: Error uploading books.json to Backblaze:', err.message);
+      console.error('   Books are saved locally but will be lost on server restart if B2 is not working!');
+      // Don't throw - allow the request to succeed, but log the critical error
+    }
+  } else {
+    console.warn('⚠️  WARNING: Backblaze B2 not configured. Books will be lost on server restart!');
+    console.warn('   Set B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_ID in your environment variables.');
+  }
 }
 
 // Helper functions for blogs JSON file
@@ -1604,9 +1618,112 @@ console.log('✅ Admin password:', ADMIN_PASSWORD ? 'Set' : 'Using default (admi
 if (!hasB2Credentials) {
   console.warn('⚠️  WARNING: Backblaze B2 credentials not fully configured in server/.env');
   console.warn('   Required: B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_ID');
+  console.warn('   ⚠️  Books will NOT persist after server restart without B2!');
 } else {
   console.log('✅ Backblaze B2 credentials loaded');
+  // Test B2 connection on startup
+  ensureB2Authorized().then(() => {
+    console.log('✅ Backblaze B2 connection verified');
+  }).catch(err => {
+    console.error('❌ Backblaze B2 connection failed:', err.message);
+    console.error('   Please check your B2 credentials!');
+  });
 }
+
+// Check Cloudinary
+const hasCloudinaryCredentials = 
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET;
+
+if (!hasCloudinaryCredentials) {
+  console.warn('⚠️  WARNING: Cloudinary credentials not configured');
+  console.warn('   Required: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET');
+  console.warn('   Cover images will not use CDN (slower loading)');
+} else {
+  console.log('✅ Cloudinary credentials loaded (for cover image CDN)');
+}
+
+// Health check endpoint - verify all services are configured correctly
+app.get('/api/health', async (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    services: {
+      backblaze: {
+        configured: hasB2Credentials,
+        working: false,
+        error: null
+      },
+      cloudinary: {
+        configured: hasCloudinaryCredentials,
+        working: false,
+        error: null
+      },
+      books: {
+        localCount: 0,
+        b2Count: null,
+        b2Working: false
+      }
+    }
+  };
+
+  // Check Backblaze
+  if (hasB2Credentials) {
+    try {
+      await ensureB2Authorized();
+      const filesResponse = await b2.listFileNames({
+        bucketId: process.env.B2_BUCKET_ID,
+        startFileName: 'data/books.json',
+        maxFileCount: 1
+      });
+      const booksJsonExists = filesResponse?.data?.files?.some(f => f.fileName === 'data/books.json');
+      health.services.backblaze.working = true;
+      health.services.books.b2Working = booksJsonExists;
+      if (booksJsonExists) {
+        const books = await downloadBooksJsonFromB2();
+        health.services.books.b2Count = books ? books.length : 0;
+      }
+    } catch (error) {
+      health.services.backblaze.working = false;
+      health.services.backblaze.error = error.message;
+      health.status = 'degraded';
+    }
+  }
+
+  // Check Cloudinary
+  if (hasCloudinaryCredentials) {
+    try {
+      const v2 = require('cloudinary').v2;
+      await v2.api.ping();
+      health.services.cloudinary.working = true;
+    } catch (error) {
+      health.services.cloudinary.working = false;
+      health.services.cloudinary.error = error.message;
+      health.status = 'degraded';
+    }
+  }
+
+  // Check local books
+  try {
+    const books = await getBooks();
+    health.services.books.localCount = books.length;
+  } catch (error) {
+    health.status = 'error';
+  }
+
+  // Overall status
+  if (!hasB2Credentials) {
+    health.status = 'warning';
+    health.message = 'Backblaze not configured - books will be lost on server restart!';
+  } else if (!health.services.backblaze.working) {
+    health.status = 'error';
+    health.message = 'Backblaze connection failed - check your credentials!';
+  }
+
+  const statusCode = health.status === 'ok' ? 200 : health.status === 'warning' ? 200 : 503;
+  res.status(statusCode).json(health);
+});
 
 // Test endpoint to check B2 connection and list files
 app.get('/api/test/b2', async (req, res) => {
