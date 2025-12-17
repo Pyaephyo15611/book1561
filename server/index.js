@@ -36,8 +36,7 @@ const getProtocol = (req) => {
 app.use(cors());
 app.use(express.json());
 
-// Serve uploaded files (covers, PDFs) statically so the reader can access them directly
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// No local file serving - all files are in Cloudinary (images) and Backblaze B2 (PDFs)
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -245,6 +244,7 @@ function getB2PublicUrl(fileName) {
 // Helper function to upload books.json to Backblaze B2
 async function uploadBooksJsonToB2(booksData) {
   if (!hasB2Credentials) {
+    console.error('❌ B2 credentials not configured - cannot upload books.json');
     return false;
   }
   
@@ -253,6 +253,8 @@ async function uploadBooksJsonToB2(booksData) {
     const jsonString = JSON.stringify(booksData, null, 2);
     const jsonBuffer = Buffer.from(jsonString, 'utf8');
     const fileName = 'data/books.json';
+    
+    console.log(`📤 Attempting to upload books.json (${booksData.length} books) to Backblaze...`);
     
     const uploadUrlResponse = await b2.getUploadUrl({
       bucketId: process.env.B2_BUCKET_ID
@@ -270,10 +272,18 @@ async function uploadBooksJsonToB2(booksData) {
       mime: 'application/json'
     });
     
-    console.log(`✅ Uploaded books.json to Backblaze: ${fileName}`);
+    if (!uploadResponse || !uploadResponse.data) {
+      throw new Error('Upload response was empty');
+    }
+    
+    console.log(`✅ Successfully uploaded books.json to Backblaze: ${fileName} (${booksData.length} books)`);
     return true;
   } catch (error) {
-    console.warn('⚠️  Failed to upload books.json to Backblaze:', error.message);
+    console.error('❌ FAILED to upload books.json to Backblaze:', error.message);
+    console.error('   Error details:', error);
+    if (error.stack) {
+      console.error('   Stack:', error.stack);
+    }
     return false;
   }
 }
@@ -553,10 +563,7 @@ app.get('/api/books/:id/cdn', async (req, res) => {
 });
 
 // Admin upload endpoint
-const imageUploadPath = path.join(__dirname, 'uploads/images');
-
-// Ensure the upload directory exists
-fs.mkdir(imageUploadPath, { recursive: true }).catch(console.error);
+// No local file storage - files go directly to Cloudinary (images) and Backblaze B2 (PDFs)
 
 app.post(
   '/api/admin/books',
@@ -586,8 +593,6 @@ app.post(
           const partFile = req.files[`pdfPart${i}`]?.[0];
           if (partFile) {
             const sanitizedPartName = `${Date.now()}-part${i}-${partFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-            const partFilePath = path.join(imageUploadPath, sanitizedPartName);
-            await fs.writeFile(partFilePath, partFile.buffer);
             
             let b2PartFileName = null;
             if (hasB2Credentials) {
@@ -596,68 +601,48 @@ app.post(
                 b2PartFileName = await uploadPdfToB2(partFile.buffer, b2Name, partFile.mimetype || 'application/pdf');
                 console.log(`✅ Uploaded Part ${i} to Backblaze: ${b2PartFileName}`);
               } catch (b2Error) {
-                console.warn(`⚠️  Failed to upload Part ${i} to Backblaze:`, b2Error.message);
+                console.error(`❌ Failed to upload Part ${i} to Backblaze:`, b2Error.message);
+                throw new Error(`Failed to upload PDF part ${i} to Backblaze: ${b2Error.message}`);
               }
+            } else {
+              throw new Error('Backblaze B2 not configured - cannot store PDF parts');
             }
 
             pdfParts.push({
               partNumber: i,
-              pdfFilePath: `/uploads/images/${sanitizedPartName}`,
               b2FileName: b2PartFileName,
-              fileName: b2PartFileName || sanitizedPartName
+              fileName: b2PartFileName
             });
           }
         }
       } else if (req.files['pdf'] && req.files['pdf'][0]) {
-        // Handle single PDF file
+        // Handle single PDF file - upload directly to Backblaze B2
         const pdfFile = req.files['pdf'][0];
         const sanitizedPdfName = `${Date.now()}-${pdfFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        pdfFilePath = path.join(imageUploadPath, sanitizedPdfName);
-        await fs.writeFile(pdfFilePath, pdfFile.buffer);
-        pdfFilePath = `/uploads/images/${sanitizedPdfName}`;
 
-        // Also upload PDF to Backblaze (if configured)
         if (hasB2Credentials) {
           try {
             const b2Name = `pdfs/${sanitizedPdfName}`;
             b2PdfFileName = await uploadPdfToB2(pdfFile.buffer, b2Name, pdfFile.mimetype || 'application/pdf');
             console.log('✅ Uploaded PDF to Backblaze:', b2PdfFileName);
           } catch (b2Error) {
-            console.warn('⚠️  Failed to upload PDF to Backblaze, using local file only:', b2Error.message || b2Error);
+            console.error('❌ Failed to upload PDF to Backblaze:', b2Error.message || b2Error);
+            throw new Error(`Failed to upload PDF to Backblaze: ${b2Error.message}`);
           }
+        } else {
+          throw new Error('Backblaze B2 not configured - cannot store PDF files');
         }
 
       } else {
         return res.status(400).json({ error: 'Please upload either a PDF file or PDF parts' });
       }
 
-      // Save Cover Image locally and to Backblaze
+      // Upload Cover Image to Cloudinary only (no local storage)
       let coverImageUrl = '';
-      let b2CoverFileName = null;
       let cloudinaryCoverUrl = null;
       if (req.files['coverImage']) {
         const imageFile = req.files['coverImage'][0];
         const sanitizedImageName = `${Date.now()}-${imageFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        const imageFilePath = path.join(imageUploadPath, sanitizedImageName);
-        await fs.writeFile(imageFilePath, imageFile.buffer);
-        // Local URL (fallback)
-        coverImageUrl = `/uploads/images/${sanitizedImageName}`;
-
-        // Try Backblaze upload for cover image
-        if (hasB2Credentials) {
-          try {
-            const b2Name = `covers/${sanitizedImageName}`;
-            b2CoverFileName = await uploadPdfToB2(
-              imageFile.buffer,
-              b2Name,
-              imageFile.mimetype || 'image/jpeg'
-            );
-            console.log('✅ Uploaded cover image to Backblaze:', b2CoverFileName);
-            // Store the B2 filename in the book data, URL will be generated on request
-          } catch (b2Error) {
-            console.warn('⚠️  Failed to upload cover image to Backblaze, using local image only:', b2Error.message || b2Error);
-          }
-        }
 
         // Upload cover image to Cloudinary for fast CDN delivery
         try {
@@ -668,11 +653,14 @@ app.post(
           });
           if (result && result.secure_url) {
             cloudinaryCoverUrl = result.secure_url;
-            coverImageUrl = cloudinaryCoverUrl; // Prefer Cloudinary URL for clients
+            coverImageUrl = cloudinaryCoverUrl;
             console.log('✅ Uploaded cover image to Cloudinary:', cloudinaryCoverUrl);
+          } else {
+            throw new Error('Cloudinary upload returned no URL');
           }
         } catch (cloudErr) {
-          console.warn('⚠️  Cloudinary upload failed for cover image:', cloudErr.message || cloudErr);
+          console.error('❌ Cloudinary upload failed for cover image:', cloudErr.message || cloudErr);
+          throw new Error(`Failed to upload cover image to Cloudinary: ${cloudErr.message}`);
         }
       }
 
@@ -688,11 +676,9 @@ app.post(
         isTrending: isTrending === 'true',
         // PDF parts (if using parts) or single file
         pdfParts: pdfParts.length > 0 ? pdfParts : null,
-        // Single file (if not using parts)
-        pdfFilePath: pdfParts.length > 0 ? null : pdfFilePath,
+        // Single file (if not using parts) - stored in Backblaze B2 only
         b2FileName: pdfParts.length > 0 ? null : (b2PdfFileName || null),
-        fileName: pdfParts.length > 0 ? null : (b2PdfFileName || (pdfFilePath ? pdfFilePath.split('/').pop() : null)),
-        b2CoverFileName: b2CoverFileName || null,
+        fileName: pdfParts.length > 0 ? null : (b2PdfFileName || null),
         coverImageUrl: coverImageUrl,
         cloudinaryCoverUrl: cloudinaryCoverUrl || null,
         createdAt: new Date().toISOString()
@@ -700,7 +686,16 @@ app.post(
 
       books.push(bookData);
       await saveBooks(books);
-      res.status(201).json(bookData);
+      
+      // Check if B2 upload succeeded - warn admin if not
+      if (!hasB2Credentials) {
+        console.warn('⚠️  Book saved locally but B2 not configured - will be lost on restart!');
+      }
+      
+      res.status(201).json({
+        ...bookData,
+        warning: !hasB2Credentials ? 'Book saved locally but Backblaze B2 not configured. Books will be lost on server restart!' : undefined
+      });
     } catch (error) {
       console.error('Error uploading book:', error);
       res.status(500).json({ error: error.message || 'Failed to upload book' });
@@ -724,69 +719,35 @@ app.put(
 
       const book = books[index];
 
-      // Update PDF if provided
+      // Update PDF if provided - upload directly to Backblaze B2 only
       if (req.files['pdf'] && req.files['pdf'][0]) {
         const pdfFile = req.files['pdf'][0];
         const sanitizedPdfName = `${Date.now()}-${pdfFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        const pdfFilePath = path.join(imageUploadPath, sanitizedPdfName);
-        await fs.writeFile(pdfFilePath, pdfFile.buffer);
 
-        let b2PdfFileName = book.b2FileName || null;
-        let cloudinaryPdfUrl = book.cloudinaryPdfUrl || null;
-
+        let b2PdfFileName = null;
         if (hasB2Credentials) {
           try {
             const b2Name = `pdfs/${sanitizedPdfName}`;
             b2PdfFileName = await uploadPdfToB2(pdfFile.buffer, b2Name, pdfFile.mimetype || 'application/pdf');
+            console.log('✅ Uploaded updated PDF to Backblaze:', b2PdfFileName);
           } catch (b2Error) {
-            console.warn('Failed to upload updated PDF to Backblaze, using local file only:', b2Error.message || b2Error);
+            console.error('❌ Failed to upload updated PDF to Backblaze:', b2Error.message || b2Error);
+            throw new Error(`Failed to upload PDF to Backblaze: ${b2Error.message}`);
           }
+        } else {
+          throw new Error('Backblaze B2 not configured - cannot store PDF files');
         }
 
-        // Update Cloudinary PDF as well
-        try {
-          const result = await uploadBufferToCloudinary(pdfFile.buffer, {
-            resource_type: 'raw',
-            folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/pdfs',
-            public_id: sanitizedPdfName.replace(/\.[^.]+$/, '')
-          });
-          if (result && result.secure_url) {
-            cloudinaryPdfUrl = result.secure_url;
-            console.log('✅ Uploaded updated PDF to Cloudinary:', cloudinaryPdfUrl);
-          }
-        } catch (cloudErr) {
-          console.warn('⚠️  Failed to upload updated PDF to Cloudinary:', cloudErr.message || cloudErr);
-        }
-
-        book.b2FileName = b2PdfFileName || book.b2FileName || null;
-        book.fileName = b2PdfFileName || sanitizedPdfName;
-        book.pdfFilePath = `/uploads/images/${sanitizedPdfName}`;
-        book.cloudinaryPdfUrl = cloudinaryPdfUrl || book.cloudinaryPdfUrl || null;
+        book.b2FileName = b2PdfFileName;
+        book.fileName = b2PdfFileName;
       }
 
-      // Update cover if provided
+      // Update cover if provided - upload directly to Cloudinary only
       if (req.files['coverImage'] && req.files['coverImage'][0]) {
         const imageFile = req.files['coverImage'][0];
         const sanitizedImageName = `${Date.now()}-${imageFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        const imageFilePath = path.join(imageUploadPath, sanitizedImageName);
-        await fs.writeFile(imageFilePath, imageFile.buffer);
-        let coverImageUrl = `/uploads/images/${sanitizedImageName}`;
-        let b2CoverFileName = book.b2CoverFileName || null;
-        let cloudinaryCoverUrl = book.cloudinaryCoverUrl || null;
 
-        if (hasB2Credentials) {
-          try {
-            const b2Name = `covers/${sanitizedImageName}`;
-            b2CoverFileName = await uploadPdfToB2(
-              imageFile.buffer,
-              b2Name,
-              imageFile.mimetype || 'image/jpeg'
-            );
-          } catch (b2Error) {
-            console.warn('Failed to upload updated cover to Backblaze, using local image only:', b2Error.message || b2Error);
-          }
-        }
-
+        let cloudinaryCoverUrl = null;
         // Upload new cover to Cloudinary
         try {
           const result = await uploadBufferToCloudinary(imageFile.buffer, {
@@ -796,17 +757,18 @@ app.put(
           });
           if (result && result.secure_url) {
             cloudinaryCoverUrl = result.secure_url;
-            coverImageUrl = cloudinaryCoverUrl;
             console.log('✅ Uploaded updated cover image to Cloudinary:', cloudinaryCoverUrl);
+          } else {
+            throw new Error('Cloudinary upload returned no URL');
           }
         } catch (cloudErr) {
-          console.warn('⚠️  Failed to upload updated cover to Cloudinary:', cloudErr.message || cloudErr);
+          console.error('❌ Failed to upload updated cover to Cloudinary:', cloudErr.message || cloudErr);
+          throw new Error(`Failed to upload cover image to Cloudinary: ${cloudErr.message}`);
         }
 
-        book.coverImage = coverImageUrl;
-        book.b2CoverFileName = b2CoverFileName;
-        book.coverImageUrl = coverImageUrl;
-        book.cloudinaryCoverUrl = cloudinaryCoverUrl || book.cloudinaryCoverUrl || null;
+        book.coverImage = cloudinaryCoverUrl;
+        book.coverImageUrl = cloudinaryCoverUrl;
+        book.cloudinaryCoverUrl = cloudinaryCoverUrl;
       }
 
       // Update simple fields
@@ -908,18 +870,7 @@ app.get('/api/books/:id/download', async (req, res) => {
         for (const part of book.pdfParts.sort((a, b) => a.partNumber - b.partNumber)) {
           let partData = null;
           
-          // Try local file first
-          if (part.pdfFilePath) {
-            const absolutePath = path.join(__dirname, part.pdfFilePath.replace(/^\/+/, ''));
-            try {
-              partData = await fs.readFile(absolutePath);
-              console.log(`✅ Loaded part ${part.partNumber} from local file`);
-            } catch (err) {
-              console.log(`Local part ${part.partNumber} not found, trying B2`);
-            }
-          }
-          
-          // Try Backblaze if local file not found
+          // Fetch PDF part from Backblaze B2 only (no local storage)
           if (!partData && part.b2FileName && hasB2Credentials) {
             try {
               const listResponse = await b2.listFileNames({
@@ -978,23 +929,7 @@ app.get('/api/books/:id/download', async (req, res) => {
 
     const downloadFileName = book.title ? `${book.title}.pdf` : 'book.pdf';
     
-    // Fast path: if we have a locally stored PDF, serve it directly
-    if (book.pdfFilePath) {
-      const absolutePath = path.join(__dirname, book.pdfFilePath.replace(/^\/+/, ''));
-      console.log('Serving local PDF file for download:', absolutePath);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(downloadFileName)}"`);
-      return res.sendFile(absolutePath, (err) => {
-        if (err) {
-          console.error('Error sending local PDF file:', err);
-          if (!res.headersSent) {
-            res.status(500).json({ error: 'Failed to download local PDF' });
-          }
-        }
-      });
-    }
-    
-    // Handle Backblaze B2 files
+    // Fetch PDF from Backblaze B2 only (no local storage)
     const fileName = book.b2FileName || book.fileName;
     
     if (!fileName) {
@@ -1161,18 +1096,7 @@ app.get('/api/books/:id/pdf/part/:partNumber', async (req, res) => {
       return res.status(404).json({ error: `Part ${partNumber} not found` });
     }
     
-    // Try local file first
-    if (part.pdfFilePath) {
-      const absolutePath = path.join(__dirname, part.pdfFilePath.replace(/^\/+/, ''));
-      try {
-        await fs.access(absolutePath);
-        return res.sendFile(absolutePath);
-      } catch (err) {
-        console.log('Local part file not found, trying Backblaze');
-      }
-    }
-    
-    // Try Backblaze
+    // Fetch PDF part from Backblaze B2 only (no local storage)
     if (part.b2FileName && hasB2Credentials) {
       try {
         await ensureB2Authorized();
@@ -1226,7 +1150,6 @@ app.get('/api/books/:id/view', async (req, res) => {
         totalParts: book.pdfParts.length,
         parts: book.pdfParts.map(p => ({
           partNumber: p.partNumber,
-          pdfFilePath: p.pdfFilePath,
           b2FileName: p.b2FileName
         }))
       });
@@ -1242,14 +1165,7 @@ app.get('/api/books/:id/view', async (req, res) => {
       return res.json({ viewUrl: proxyUrl, isSplit: false });
     }
 
-    // Fallback: locally stored PDF on disk (pdfFilePath)
-    if (book.pdfFilePath) {
-      const protocol = getProtocol(req);
-      const directUrl = `${protocol}://${req.get('host')}${book.pdfFilePath}`;
-      return res.json({ viewUrl: directUrl, isSplit: false });
-    }
-
-    return res.status(400).json({ error: 'Book file not found' });
+    return res.status(400).json({ error: 'Book file not found in Backblaze B2' });
   } catch (error) {
     console.error('Error getting view URL:', error);
     res.status(500).json({ error: 'Failed to get view URL' });
@@ -1283,20 +1199,7 @@ app.get('/api/books/:id/pdf', async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
     
-    // Fast path: if we have a locally stored PDF, serve it directly
-    if (book.pdfFilePath) {
-      const absolutePath = path.join(__dirname, book.pdfFilePath.replace(/^\/+/, ''));
-      console.log('Serving local PDF file:', absolutePath);
-      return res.sendFile(absolutePath, (err) => {
-        if (err) {
-          console.error('Error sending local PDF file:', err);
-          if (!res.headersSent) {
-            res.status(500).json({ error: 'Failed to send local PDF file' });
-          }
-        }
-      });
-    }
-    
+    // Fetch PDF from Backblaze B2 only (no local storage)
     const fileName = book.b2FileName || book.fileName;
     
     if (!fileName) {
@@ -1644,6 +1547,53 @@ if (!hasCloudinaryCredentials) {
   console.log('✅ Cloudinary credentials loaded (for cover image CDN)');
 }
 
+// Diagnostic endpoint to check books.json status
+app.get('/api/debug/books-status', async (req, res) => {
+  try {
+    const status = {
+      local: {
+        exists: false,
+        count: 0,
+        path: BOOKS_FILE
+      },
+      backblaze: {
+        configured: hasB2Credentials,
+        exists: false,
+        count: 0,
+        error: null
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    // Check local file
+    try {
+      const data = await fs.readFile(BOOKS_FILE, 'utf8');
+      const books = JSON.parse(data);
+      status.local.exists = true;
+      status.local.count = books.length;
+    } catch (err) {
+      status.local.error = err.message;
+    }
+
+    // Check Backblaze
+    if (hasB2Credentials) {
+      try {
+        const booksFromB2 = await downloadBooksJsonFromB2();
+        if (booksFromB2) {
+          status.backblaze.exists = true;
+          status.backblaze.count = booksFromB2.length;
+        }
+      } catch (err) {
+        status.backblaze.error = err.message;
+      }
+    }
+
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Health check endpoint - verify all services are configured correctly
 app.get('/api/health', async (req, res) => {
   const health = {
@@ -1766,71 +1716,16 @@ app.get('/api/books/:id/cover', async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
     
-    // ALWAYS check local files FIRST before trying B2
-    if (book.coverImage) {
-      const coverImage = book.coverImage.trim();
-      
-      // Build list of all possible local paths to check
-      const possiblePaths = [];
-      
-      // If it starts with /uploads, try direct path
-      if (coverImage.startsWith('/uploads')) {
-        possiblePaths.push(path.join(__dirname, coverImage.replace(/^\/+/, '')));
-      }
-      
-      // If it's a relative path (like "covers/filename.jpg"), try multiple locations
-      if (!coverImage.startsWith('/') && !coverImage.startsWith('http')) {
-        possiblePaths.push(
-          path.join(__dirname, 'uploads', 'images', coverImage.replace('covers/', '')), // Remove covers/ prefix: uploads/images/filename.jpg
-          path.join(__dirname, 'uploads', 'images', coverImage), // Keep as is: uploads/images/covers/filename.jpg
-          path.join(__dirname, 'uploads', coverImage), // In uploads folder: uploads/covers/filename.jpg
-          path.join(__dirname, coverImage) // Absolute from server root
-        );
-      }
-      
-      // Try each possible path
-      for (const possiblePath of possiblePaths) {
-        try {
-          await fs.access(possiblePath);
-          const ext = path.extname(possiblePath).toLowerCase();
-          const contentTypes = {
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.gif': 'image/gif',
-            '.webp': 'image/webp'
-          };
-          res.setHeader('Content-Type', contentTypes[ext] || 'image/jpeg');
-          res.setHeader('Cache-Control', 'public, max-age=31536000');
-          console.log('✅ Serving local cover image from:', possiblePath);
-          return res.sendFile(possiblePath);
-        } catch (err) {
-          // Try next path
-          continue;
-        }
-      }
-      
-      console.log('⚠️ Local cover image not found, tried paths:', possiblePaths);
+    // Cover images are stored in Cloudinary - redirect to Cloudinary URL
+    const coverImageUrl = book.cloudinaryCoverUrl || book.coverImage;
+    
+    if (coverImageUrl && (coverImageUrl.startsWith('http://') || coverImageUrl.startsWith('https://'))) {
+      // Redirect to Cloudinary URL
+      console.log('✅ Redirecting to Cloudinary cover image:', coverImageUrl);
+      return res.redirect(coverImageUrl);
     }
     
-    // ONLY if local file not found, try Backblaze
-    const b2CoverFileName =
-      book.b2CoverFileName ||
-      (book.coverImage && !book.coverImage.startsWith('/') && !book.coverImage.startsWith('http')
-        ? book.coverImage
-        : null);
-
-    // Try Backblaze redirect if configured
-    if (b2CoverFileName && process.env.B2_BUCKET_ID) {
-      const region = process.env.B2_REGION || 'us-west-004';
-      const bucketId = process.env.B2_BUCKET_ID;
-      const encodedName = encodeURIComponent(b2CoverFileName);
-      const publicUrl = `https://f${bucketId}.s3.${region}.backblazeb2.com/${encodedName}`;
-      console.log('🔄 Trying B2 redirect (local file not found):', publicUrl);
-      return res.redirect(publicUrl);
-    }
-    
-    // No cover image available - return a default placeholder or 404
+    // No cover image available
     console.error('❌ Cover image not found for book:', book.id, 'coverImage:', book.coverImage);
     return res.status(404).json({ error: 'Cover image not found' });
   } catch (error) {
@@ -1967,30 +1862,27 @@ app.post(
       const blogs = await getBlogs();
       const blogId = `blog_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // Save image locally and to Backblaze
+      // Upload blog image to Cloudinary only (no local storage)
       let imageUrl = '';
-      let b2ImageFileName = null;
       if (req.file) {
         const imageFile = req.file;
         const sanitizedImageName = `${Date.now()}-${imageFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        const imageFilePath = path.join(imageUploadPath, sanitizedImageName);
-        await fs.writeFile(imageFilePath, imageFile.buffer);
-        imageUrl = `/uploads/images/${sanitizedImageName}`;
 
-        // Try Backblaze upload
-        if (hasB2Credentials) {
-          try {
-            const b2Name = `blogs/${sanitizedImageName}`;
-            b2ImageFileName = await uploadPdfToB2(
-              imageFile.buffer,
-              b2Name,
-              imageFile.mimetype || 'image/jpeg'
-            );
-            console.log('✅ Uploaded blog image to Backblaze:', b2ImageFileName);
-            imageUrl = b2ImageFileName;
-          } catch (b2Error) {
-            console.warn('⚠️  Failed to upload blog image to Backblaze, using local image only:', b2Error.message || b2Error);
+        try {
+          const result = await uploadBufferToCloudinary(imageFile.buffer, {
+            resource_type: 'image',
+            folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/blogs',
+            public_id: sanitizedImageName.replace(/\.[^.]+$/, '')
+          });
+          if (result && result.secure_url) {
+            imageUrl = result.secure_url;
+            console.log('✅ Uploaded blog image to Cloudinary:', imageUrl);
+          } else {
+            throw new Error('Cloudinary upload returned no URL');
           }
+        } catch (cloudErr) {
+          console.error('❌ Cloudinary upload failed for blog image:', cloudErr.message || cloudErr);
+          throw new Error(`Failed to upload blog image to Cloudinary: ${cloudErr.message}`);
         }
       }
 
@@ -2002,7 +1894,6 @@ app.post(
         category: category?.trim() || 'GENERAL',
         image: imageUrl,
         date: date || new Date().toISOString().split('T')[0],
-        b2ImageFileName: b2ImageFileName || null,
         createdAt: new Date().toISOString()
       };
 
@@ -2032,29 +1923,27 @@ app.put(
 
       const blog = blogs[index];
 
-      // Update image if provided
+      // Update image if provided - upload to Cloudinary only
       if (req.file) {
         const imageFile = req.file;
         const sanitizedImageName = `${Date.now()}-${imageFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        const imageFilePath = path.join(imageUploadPath, sanitizedImageName);
-        await fs.writeFile(imageFilePath, imageFile.buffer);
 
-        let b2ImageFileName = blog.b2ImageFileName || null;
-        if (hasB2Credentials) {
-          try {
-            const b2Name = `blogs/${sanitizedImageName}`;
-            b2ImageFileName = await uploadPdfToB2(
-              imageFile.buffer,
-              b2Name,
-              imageFile.mimetype || 'image/jpeg'
-            );
-          } catch (b2Error) {
-            console.warn('Failed to upload updated blog image to Backblaze, using local file only:', b2Error.message || b2Error);
+        try {
+          const result = await uploadBufferToCloudinary(imageFile.buffer, {
+            resource_type: 'image',
+            folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/blogs',
+            public_id: sanitizedImageName.replace(/\.[^.]+$/, '')
+          });
+          if (result && result.secure_url) {
+            blog.image = result.secure_url;
+            console.log('✅ Uploaded updated blog image to Cloudinary:', blog.image);
+          } else {
+            throw new Error('Cloudinary upload returned no URL');
           }
+        } catch (cloudErr) {
+          console.error('❌ Failed to upload updated blog image to Cloudinary:', cloudErr.message || cloudErr);
+          throw new Error(`Failed to upload blog image to Cloudinary: ${cloudErr.message}`);
         }
-
-        blog.image = b2ImageFileName || `/uploads/images/${sanitizedImageName}`;
-        blog.b2ImageFileName = b2ImageFileName || null;
       }
 
       // Update other fields
@@ -2100,71 +1989,14 @@ app.get('/api/blogs/:id/image', async (req, res) => {
       return res.status(404).json({ error: 'Blog not found' });
     }
     
-    // ALWAYS check local files FIRST before trying B2
-    if (blog.image) {
-      const blogImage = blog.image.trim();
-      
-      // Build list of all possible local paths to check
-      const possiblePaths = [];
-      
-      // If it starts with /uploads, try direct path
-      if (blogImage.startsWith('/uploads')) {
-        possiblePaths.push(path.join(__dirname, blogImage.replace(/^\/+/, '')));
-      }
-      
-      // If it's a relative path, try multiple locations
-      if (!blogImage.startsWith('/') && !blogImage.startsWith('http')) {
-        possiblePaths.push(
-          path.join(__dirname, 'uploads', 'images', blogImage.replace('blogs/', '')), // Remove blogs/ prefix
-          path.join(__dirname, 'uploads', 'images', blogImage), // Keep as is
-          path.join(__dirname, 'uploads', blogImage), // In uploads folder
-          path.join(__dirname, blogImage) // Absolute from server root
-        );
-      }
-      
-      // Try each possible path
-      for (const possiblePath of possiblePaths) {
-        try {
-          await fs.access(possiblePath);
-          const ext = path.extname(possiblePath).toLowerCase();
-          const contentTypes = {
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.png': 'image/png',
-            '.gif': 'image/gif',
-            '.webp': 'image/webp'
-          };
-          res.setHeader('Content-Type', contentTypes[ext] || 'image/jpeg');
-          res.setHeader('Cache-Control', 'public, max-age=31536000');
-          console.log('✅ Serving local blog image from:', possiblePath);
-          return res.sendFile(possiblePath);
-        } catch (err) {
-          // Try next path
-          continue;
-        }
-      }
-      
-      console.log('⚠️ Local blog image not found, tried paths:', possiblePaths);
+    // Blog images are stored in Cloudinary - redirect to Cloudinary URL
+    if (blog.image && (blog.image.startsWith('http://') || blog.image.startsWith('https://'))) {
+      // Redirect to Cloudinary URL
+      console.log('✅ Redirecting to Cloudinary blog image:', blog.image);
+      return res.redirect(blog.image);
     }
     
-    // ONLY if local file not found, try Backblaze
-    const b2ImageFileName =
-      blog.b2ImageFileName ||
-      (blog.image && !blog.image.startsWith('/') && !blog.image.startsWith('http')
-        ? blog.image
-        : null);
-
-    // Try Backblaze redirect if configured
-    if (b2ImageFileName && process.env.B2_BUCKET_ID) {
-      const region = process.env.B2_REGION || 'us-west-004';
-      const bucketId = process.env.B2_BUCKET_ID;
-      const encodedName = encodeURIComponent(b2ImageFileName);
-      const publicUrl = `https://f${bucketId}.s3.${region}.backblazeb2.com/${encodedName}`;
-      console.log('🔄 Trying B2 redirect (local file not found):', publicUrl);
-      return res.redirect(publicUrl);
-    }
-    
-    // No image available - return a default placeholder or 404
+    // No image available
     console.error('❌ Blog image not found for blog:', blog.id, 'image:', blog.image);
     return res.status(404).json({ error: 'Blog image not found' });
   } catch (error) {
