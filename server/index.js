@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const B2 = require('backblaze-b2');
+const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 const fs = require('fs').promises;
 const path = require('path');
@@ -80,6 +81,25 @@ const hasB2Credentials =
   process.env.B2_APPLICATION_KEY &&
   process.env.B2_BUCKET_ID;
 
+// Cloudinary configuration
+const hasCloudinaryCredentials =
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET;
+
+if (hasCloudinaryCredentials) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  });
+  console.log('✅ Cloudinary credentials loaded');
+} else {
+  console.warn(
+    '⚠️  WARNING: Cloudinary credentials not fully configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET for CDN image/PDF hosting.'
+  );
+}
+
 const b2 = hasB2Credentials
   ? new B2({
       applicationKeyId: process.env.B2_APPLICATION_KEY_ID,
@@ -111,6 +131,31 @@ async function ensureB2Authorized() {
       throw new Error(`B2 authorization failed: ${error.message || 'Check your credentials'}`);
     }
   }
+}
+
+// Helper: upload buffer to Cloudinary (image or raw for PDFs)
+function uploadBufferToCloudinary(buffer, options) {
+  return new Promise((resolve, reject) => {
+    if (!hasCloudinaryCredentials) {
+      return resolve(null);
+    }
+
+    const uploadOptions = {
+      folder: process.env.CLOUDINARY_FOLDER || 'bookstore',
+      resource_type: 'image',
+      ...options
+    };
+
+    const uploadStream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+      if (error) {
+        console.warn('⚠️  Cloudinary upload failed:', error.message || error);
+        return resolve(null); // Do not hard fail; just skip Cloudinary
+      }
+      resolve(result);
+    });
+
+    uploadStream.end(buffer);
+  });
 }
 
 function encodeB2Path(fileName) {
@@ -377,6 +422,12 @@ app.get('/api/books', async (req, res) => {
     const protocol = getProtocol(req);
     const booksWithUrls = books.map(book => {
       const bookResponse = { ...book };
+      // Prefer Cloudinary cover URL if available
+      if (book.cloudinaryCoverUrl) {
+        bookResponse.coverImage = book.cloudinaryCoverUrl;
+        return bookResponse;
+      }
+
       if (book.b2CoverFileName || (book.coverImage && !book.coverImage.startsWith('/') && !book.coverImage.startsWith('http'))) {
         // It's a B2 filename, use proxy endpoint
         bookResponse.coverImage = `${protocol}://${req.get('host')}/api/books/${book.id}/cover`;
@@ -407,7 +458,11 @@ app.get('/api/books/:id', async (req, res) => {
     // Transform cover image URL to use proxy endpoint if it's from B2
     const protocol = getProtocol(req);
     const bookResponse = { ...book };
-    if (book.b2CoverFileName || (book.coverImage && !book.coverImage.startsWith('/') && !book.coverImage.startsWith('http'))) {
+
+    // Prefer Cloudinary cover URL if available
+    if (book.cloudinaryCoverUrl) {
+      bookResponse.coverImage = book.cloudinaryCoverUrl;
+    } else if (book.b2CoverFileName || (book.coverImage && !book.coverImage.startsWith('/') && !book.coverImage.startsWith('http'))) {
       // It's a B2 filename, use proxy endpoint
       bookResponse.coverImage = `${protocol}://${req.get('host')}/api/books/${req.params.id}/cover`;
     } else if (book.coverImage && book.coverImage.startsWith('/uploads')) {
@@ -530,7 +585,7 @@ app.post(
                 console.warn(`⚠️  Failed to upload Part ${i} to Backblaze:`, b2Error.message);
               }
             }
-            
+
             pdfParts.push({
               partNumber: i,
               pdfFilePath: `/uploads/images/${sanitizedPartName}`,
@@ -557,6 +612,7 @@ app.post(
             console.warn('⚠️  Failed to upload PDF to Backblaze, using local file only:', b2Error.message || b2Error);
           }
         }
+
       } else {
         return res.status(400).json({ error: 'Please upload either a PDF file or PDF parts' });
       }
@@ -564,6 +620,7 @@ app.post(
       // Save Cover Image locally and to Backblaze
       let coverImageUrl = '';
       let b2CoverFileName = null;
+      let cloudinaryCoverUrl = null;
       if (req.files['coverImage']) {
         const imageFile = req.files['coverImage'][0];
         const sanitizedImageName = `${Date.now()}-${imageFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
@@ -582,12 +639,26 @@ app.post(
               imageFile.mimetype || 'image/jpeg'
             );
             console.log('✅ Uploaded cover image to Backblaze:', b2CoverFileName);
-            // Use proxy endpoint for B2 images (works with private buckets)
             // Store the B2 filename in the book data, URL will be generated on request
-            coverImageUrl = b2CoverFileName; // Store B2 filename, we'll proxy it
           } catch (b2Error) {
             console.warn('⚠️  Failed to upload cover image to Backblaze, using local image only:', b2Error.message || b2Error);
           }
+        }
+
+        // Upload cover image to Cloudinary for fast CDN delivery
+        try {
+          const result = await uploadBufferToCloudinary(imageFile.buffer, {
+            resource_type: 'image',
+            folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/covers',
+            public_id: sanitizedImageName.replace(/\.[^.]+$/, '')
+          });
+          if (result && result.secure_url) {
+            cloudinaryCoverUrl = result.secure_url;
+            coverImageUrl = cloudinaryCoverUrl; // Prefer Cloudinary URL for clients
+            console.log('✅ Uploaded cover image to Cloudinary:', cloudinaryCoverUrl);
+          }
+        } catch (cloudErr) {
+          console.warn('⚠️  Cloudinary upload failed for cover image:', cloudErr.message || cloudErr);
         }
       }
 
@@ -609,6 +680,7 @@ app.post(
         fileName: pdfParts.length > 0 ? null : (b2PdfFileName || (pdfFilePath ? pdfFilePath.split('/').pop() : null)),
         b2CoverFileName: b2CoverFileName || null,
         coverImageUrl: coverImageUrl,
+        cloudinaryCoverUrl: cloudinaryCoverUrl || null,
         createdAt: new Date().toISOString()
       };
 
@@ -646,6 +718,8 @@ app.put(
         await fs.writeFile(pdfFilePath, pdfFile.buffer);
 
         let b2PdfFileName = book.b2FileName || null;
+        let cloudinaryPdfUrl = book.cloudinaryPdfUrl || null;
+
         if (hasB2Credentials) {
           try {
             const b2Name = `pdfs/${sanitizedPdfName}`;
@@ -655,9 +729,25 @@ app.put(
           }
         }
 
+        // Update Cloudinary PDF as well
+        try {
+          const result = await uploadBufferToCloudinary(pdfFile.buffer, {
+            resource_type: 'raw',
+            folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/pdfs',
+            public_id: sanitizedPdfName.replace(/\.[^.]+$/, '')
+          });
+          if (result && result.secure_url) {
+            cloudinaryPdfUrl = result.secure_url;
+            console.log('✅ Uploaded updated PDF to Cloudinary:', cloudinaryPdfUrl);
+          }
+        } catch (cloudErr) {
+          console.warn('⚠️  Failed to upload updated PDF to Cloudinary:', cloudErr.message || cloudErr);
+        }
+
         book.b2FileName = b2PdfFileName || book.b2FileName || null;
         book.fileName = b2PdfFileName || sanitizedPdfName;
         book.pdfFilePath = `/uploads/images/${sanitizedPdfName}`;
+        book.cloudinaryPdfUrl = cloudinaryPdfUrl || book.cloudinaryPdfUrl || null;
       }
 
       // Update cover if provided
@@ -668,6 +758,7 @@ app.put(
         await fs.writeFile(imageFilePath, imageFile.buffer);
         let coverImageUrl = `/uploads/images/${sanitizedImageName}`;
         let b2CoverFileName = book.b2CoverFileName || null;
+        let cloudinaryCoverUrl = book.cloudinaryCoverUrl || null;
 
         if (hasB2Credentials) {
           try {
@@ -677,15 +768,31 @@ app.put(
               b2Name,
               imageFile.mimetype || 'image/jpeg'
             );
-            coverImageUrl = b2CoverFileName;
           } catch (b2Error) {
             console.warn('Failed to upload updated cover to Backblaze, using local image only:', b2Error.message || b2Error);
           }
         }
 
+        // Upload new cover to Cloudinary
+        try {
+          const result = await uploadBufferToCloudinary(imageFile.buffer, {
+            resource_type: 'image',
+            folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/covers',
+            public_id: sanitizedImageName.replace(/\.[^.]+$/, '')
+          });
+          if (result && result.secure_url) {
+            cloudinaryCoverUrl = result.secure_url;
+            coverImageUrl = cloudinaryCoverUrl;
+            console.log('✅ Uploaded updated cover image to Cloudinary:', cloudinaryCoverUrl);
+          }
+        } catch (cloudErr) {
+          console.warn('⚠️  Failed to upload updated cover to Cloudinary:', cloudErr.message || cloudErr);
+        }
+
         book.coverImage = coverImageUrl;
         book.b2CoverFileName = b2CoverFileName;
         book.coverImageUrl = coverImageUrl;
+        book.cloudinaryCoverUrl = cloudinaryCoverUrl || book.cloudinaryCoverUrl || null;
       }
 
       // Update simple fields
