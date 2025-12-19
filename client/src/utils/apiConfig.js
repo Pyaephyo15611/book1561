@@ -5,7 +5,7 @@
 const baseUrlEnv = process.env.REACT_APP_API_URL;
 const API_URL = baseUrlEnv && baseUrlEnv.trim()
   ? baseUrlEnv.trim().replace(/\/$/, '') // Remove trailing slash
-  : 'http://localhost:5000';
+  : 'https://minibook-z3t6.onrender.com';
 
 export { API_URL };
 
