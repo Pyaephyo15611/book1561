@@ -1242,15 +1242,10 @@ app.options('/api/books/:id/pdf', (req, res) => {
   res.sendStatus(200);
 });
 
-// Proxy endpoint to serve PDF with CORS headers (works with private buckets)
+// Redirect to Backblaze B2 signed URL for PDF
 app.get('/api/books/:id/pdf', async (req, res) => {
   const startTime = Date.now();
   console.log('📄 PDF request received for book ID:', req.params.id);
-  
-  // Set CORS headers (always needed)
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
   try {
     const books = await getBooks();
@@ -1261,7 +1256,7 @@ app.get('/api/books/:id/pdf', async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
     
-    // Fetch PDF from Backblaze B2 only (no local storage)
+    // Get the file name from book data
     const fileName = book.b2FileName || book.fileName;
     
     if (!fileName) {
@@ -1274,49 +1269,49 @@ app.get('/api/books/:id/pdf', async (req, res) => {
       return res.status(500).json({ error: 'Backblaze B2 is not configured' });
     }
     
-    console.log('Fetching PDF from Backblaze (private bucket):', fileName);
+    console.log('Generating signed URL for PDF:', fileName);
     
     try {
       // Ensure B2 is authorized
       await ensureB2Authorized();
-      console.log('B2 authorized successfully');
       
-      // Try to use cached fileId first to avoid listing the whole bucket every time
-      let fileInfo = null;
-      let fileId = book.b2FileId || null;
-
-      if (!fileId) {
-        console.log('No cached fileId, listing bucket to find file:', fileName);
-        // List files once to find the file and cache its fileId
-        const allFilesResponse = await b2.listFileNames({
-          bucketId: process.env.B2_BUCKET_ID,
-          startFileName: '',
-          maxFileCount: 10000
-        });
-
-        if (!allFilesResponse || !allFilesResponse.data) {
-          throw new Error('Failed to list files from Backblaze');
-        }
-
-        const allFiles = allFilesResponse.data.files || [];
-        console.log(`Found ${allFiles.length} total files in bucket`);
-        console.log(`Looking for file: "${fileName}"`);
-
-        // First try exact match
-        fileInfo = allFiles.find(f => f.fileName === fileName);
-
-        // If not found, try case-insensitive match
-        if (!fileInfo) {
-          fileInfo = allFiles.find(f => f.fileName.toLowerCase() === fileName.toLowerCase());
-        }
-
-        // If still not found, try matching by the base filename (without timestamp prefix)
-        if (!fileInfo) {
-          const baseFileName = fileName.split('-').slice(1).join('-');
-          console.log(`Trying to match base filename: "${baseFileName}"`);
-          fileInfo = allFiles.find(f => {
-            const fBaseName = f.fileName.split('-').slice(1).join('-');
-            return fBaseName === baseFileName || f.fileName.endsWith(baseFileName);
+      // Generate a signed URL that's valid for 1 hour
+      const authResponse = await b2.getDownloadAuthorization({
+        bucketId: process.env.B2_BUCKET_ID,
+        fileNamePrefix: fileName,
+        validDurationInSeconds: 3600, // 1 hour
+        b2ContentDisposition: `attachment; filename="${book.title || 'book'}.pdf"`
+      });
+      
+      const token = authResponse?.data?.authorizationToken;
+      const baseUrl = getB2DownloadBaseUrl();
+      
+      if (!token || !baseUrl) {
+        throw new Error('Failed to generate signed URL');
+      }
+      
+      const encodedPath = encodeB2Path(fileName);
+      const bucketName = process.env.B2_BUCKET_NAME;
+      const signedUrl = `${baseUrl}/file/${bucketName}/${encodedPath}?Authorization=${encodeURIComponent(token)}`;
+      
+      console.log(`✅ Generated signed URL for ${fileName} (${Date.now() - startTime}ms)`);
+      
+      // Redirect to the signed URL
+      return res.redirect(302, signedUrl);
+    } catch (error) {
+      console.error('❌ Error generating signed URL:', error);
+      return res.status(500).json({ 
+        error: 'Failed to generate download URL',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error processing PDF request:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
           });
         }
 
