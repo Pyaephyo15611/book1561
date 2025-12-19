@@ -1533,12 +1533,7 @@ if (!hasB2Credentials) {
   });
 }
 
-// Check Cloudinary
-const hasCloudinaryCredentials = 
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET;
-
+// Check Cloudinary configuration
 if (!hasCloudinaryCredentials) {
   console.warn('⚠️  WARNING: Cloudinary credentials not configured');
   console.warn('   Required: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET');
