@@ -36,7 +36,11 @@ const getProtocol = (req) => {
 app.use(cors());
 app.use(express.json());
 
+// Serve uploads folder locally for cover images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // No local file serving - all files are in Cloudinary (images) and Backblaze B2 (PDFs)
+// (Legacy local files in 'uploads' are served above)
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -107,6 +111,24 @@ const b2 = hasB2Credentials
   : null;
 
 const CDN_URL_TTL_SECONDS = parseInt(process.env.CDN_URL_TTL_SECONDS || '3600', 10);
+
+let timeOffset = 0;
+async function syncTime() {
+  try {
+    // Fetch a reliable time source (Google) to calculate local clock drift
+    const response = await axios.head('https://www.google.com');
+    if (response.headers.date) {
+      const serverDate = new Date(response.headers.date);
+      const localDate = new Date();
+      timeOffset = serverDate.getTime() - localDate.getTime();
+      console.log(`⏱️  Time sync: Local clock is ${timeOffset > 0 ? 'behind' : 'ahead'} by ${Math.abs(timeOffset) / 1000}s`);
+    }
+  } catch (error) {
+    console.warn('⚠️  Time sync failed, using local time:', error.message);
+  }
+}
+// Sync time on startup
+syncTime();
 
 let b2Authorized = false;
 let b2AuthData = null;
@@ -180,7 +202,7 @@ async function getB2CdnUrl(fileName) {
 
   const auth = await b2.getDownloadAuthorization({
     bucketId: process.env.B2_BUCKET_ID,
-    fileNamePrefix: fileName,
+    fileNamePrefix: encodeB2Path(fileName), // Ensure prefix matches encoded path
     validDurationInSeconds: CDN_URL_TTL_SECONDS
   });
 
@@ -438,55 +460,8 @@ function verifyAdminPassword(req, res, next) {
   next();
 }
 
-// Serve cover image
-app.get('/api/books/:id/cover', async (req, res) => {
-  try {
-    const books = await getBooks();
-    const book = books.find(b => b.id === req.params.id);
-    
-    if (!book) {
-      return res.status(404).json({ error: 'Book not found' });
-    }
-
-    // If using Cloudinary, redirect to Cloudinary URL if available
-    if (book.cloudinaryCoverUrl) {
-      return res.redirect(book.cloudinaryCoverUrl);
-    }
-
-    // If using B2, serve from B2
-    if (book.b2CoverFileName) {
-      try {
-        await ensureB2Authorized();
-        const response = await b2.downloadFileByName({
-          Bucket: process.env.B2_BUCKET_NAME,
-          Key: book.b2CoverFileName,
-          ResponseContentType: 'image/jpeg', // Adjust based on your image type
-        });
-        
-        res.set('Content-Type', 'image/jpeg');
-        res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
-        return res.send(response.Body);
-      } catch (error) {
-        console.error('Error serving cover from B2:', error);
-        return res.status(500).json({ error: 'Failed to retrieve cover image' });
-      }
-    }
-
-    // Fallback to local file if available
-    if (book.coverImage) {
-      if (book.coverImage.startsWith('http')) {
-        return res.redirect(book.coverImage);
-      }
-      return res.sendFile(path.join(__dirname, book.coverImage));
-    }
-
-    // No cover image found
-    return res.status(404).json({ error: 'Cover image not found' });
-  } catch (error) {
-    console.error('Error serving cover image:', error);
-    res.status(500).json({ error: 'Failed to retrieve cover image' });
-  }
-});
+// Serve cover image - Moved to later in the file (around line 1500) to use proxy logic
+// app.get('/api/books/:id/cover', ...);
 
 // Get all books
 app.get('/api/books', async (req, res) => {
@@ -657,20 +632,23 @@ app.post(
           if (partFile) {
             const sanitizedPartName = `part-${i}-${Date.now()}-${partFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
             
-            // Upload PDF part to Backblaze B2
-            const b2PartFileName = await uploadPdfToB2(
-              partFile.buffer, 
-              `books/${bookId}/parts/${sanitizedPartName}.pdf`,
-              partFile.mimetype || 'application/pdf'
-            );
-            
-            console.log(`✅ Uploaded Part ${i} to Backblaze: ${b2PartFileName}`);
-
-            pdfParts.push({
-              partNumber: i,
-              b2FileName: b2PartFileName,
-              fileName: b2PartFileName
-            });
+            // Upload PDF part to Backblaze B2 (tolerate failures)
+            try {
+              const b2PartFileName = await uploadPdfToB2(
+                partFile.buffer,
+                `books/${bookId}/parts/${sanitizedPartName}.pdf`,
+                partFile.mimetype || 'application/pdf'
+              );
+              console.log(`✅ Uploaded Part ${i} to Backblaze: ${b2PartFileName}`);
+              pdfParts.push({
+                partNumber: i,
+                b2FileName: b2PartFileName,
+                fileName: b2PartFileName
+              });
+            } catch (e) {
+              console.warn(`⚠️  Failed to upload Part ${i} to Backblaze:`, e.message || e);
+              // Skip this part, continue with metadata-only if needed
+            }
           }
         }
       } else if (req.files['pdf']?.[0]) {
@@ -678,48 +656,64 @@ app.post(
         const pdfFile = req.files['pdf'][0];
         const sanitizedPdfName = `book-${Date.now()}-${pdfFile.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
         
-        // Upload PDF to Backblaze B2
-        b2PdfFileName = await uploadPdfToB2(
-          pdfFile.buffer,
-          `books/${bookId}/${sanitizedPdfName}.pdf`,
-          pdfFile.mimetype || 'application/pdf'
-        );
-        
-        console.log('✅ Uploaded PDF to Backblaze:', b2PdfFileName);
-      } else if (!req.files['pdf'] && !hasParts) {
-        return res.status(400).json({ error: 'Please upload either a PDF file or PDF parts' });
-      }
-
-      // Upload Cover Image to Cloudinary
-      if (!req.files['coverImage']?.[0]) {
-        throw new Error('Cover image is required');
-      }
-      
-      const imageFile = req.files['coverImage'][0];
-      const cloudinaryResult = await cloudinary.uploader.upload(
-        `data:${imageFile.mimetype};base64,${imageFile.buffer.toString('base64')}`, 
-        {
-          folder: process.env.CLOUDINARY_FOLDER ? 
-            `${process.env.CLOUDINARY_FOLDER}/book-covers` : 'bookstore/book-covers',
-          public_id: `cover-${bookId}`,
-          resource_type: 'image',
-          format: 'webp',
-          quality: 'auto:good',
-          width: 600,
-          crop: 'limit',
-          transformation: [
-            { width: 600, height: 900, crop: 'fill' },
-            { quality: 'auto:good' }
-          ]
+        // Upload PDF to Backblaze B2 (tolerate failures)
+        try {
+          b2PdfFileName = await uploadPdfToB2(
+            pdfFile.buffer,
+            `books/${bookId}/${sanitizedPdfName}.pdf`,
+            pdfFile.mimetype || 'application/pdf'
+          );
+          console.log('✅ Uploaded PDF to Backblaze:', b2PdfFileName);
+        } catch (e) {
+          console.warn('⚠️  Failed to upload PDF to Backblaze, continuing without attaching file:', e.message || e);
+          b2PdfFileName = null;
         }
-      );
-
-      if (!cloudinaryResult?.secure_url) {
-        throw new Error('Failed to upload cover image to Cloudinary');
+      } else if (!req.files['pdf'] && !hasParts) {
+        // Allow metadata-only book creation regardless of B2 configuration
+        console.warn('⚠️  Creating book without PDF (metadata-only).');
       }
 
-      const cloudinaryCoverUrl = cloudinaryResult.secure_url;
-      console.log('✅ Uploaded cover image to Cloudinary:', cloudinaryCoverUrl);
+      // Upload Cover Image to Cloudinary if provided and configured; else use fallback
+      let cloudinaryCoverUrl = null;
+      if (req.files['coverImage']?.[0] && hasCloudinaryCredentials) {
+        const imageFile = req.files['coverImage'][0];
+        // Use upload_stream instead of direct upload for buffers to avoid signature timestamp issues
+        const cloudinaryResult = await new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder: process.env.CLOUDINARY_FOLDER ?
+                `${process.env.CLOUDINARY_FOLDER}/book-covers` : 'bookstore/book-covers',
+              public_id: `cover-${bookId}`,
+              resource_type: 'image',
+              format: 'webp',
+              quality: 'auto:good',
+              width: 600,
+              crop: 'limit',
+              timestamp: Math.floor((Date.now() + timeOffset) / 1000),
+              transformation: [
+                { width: 600, height: 900, crop: 'fill' },
+                { quality: 'auto:good' }
+              ]
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          uploadStream.end(imageFile.buffer);
+        });
+        if (!cloudinaryResult?.secure_url) {
+          throw new Error('Failed to upload cover image to Cloudinary');
+        }
+        cloudinaryCoverUrl = cloudinaryResult.secure_url;
+        console.log('✅ Uploaded cover image to Cloudinary:', cloudinaryCoverUrl);
+      } else if (req.files['coverImage']?.[0] && !hasCloudinaryCredentials) {
+        // No Cloudinary: save nothing, but log
+        console.warn('⚠️  Cover image provided but Cloudinary is not configured. Using default cover.');
+      }
+
+      // Choose cover image: Cloudinary result or default placeholder (public hosted fallback)
+      const coverImageUrl = cloudinaryCoverUrl || 'https://via.placeholder.com/600x900.webp?text=Book+Cover';
 
       const bookData = {
         id: bookId,
@@ -727,7 +721,7 @@ app.post(
         author: author.trim(),
         description: description?.trim() || '',
         category: category?.trim() || 'General',
-        coverImage: cloudinaryCoverUrl,
+        coverImage: coverImageUrl,
         readingTime: readingTime?.trim() || 'Flexible',
         rating: rating ? Number(rating) : 0,
         isTrending: isTrending === 'true',
@@ -735,16 +729,16 @@ app.post(
         b2FileName: pdfParts.length > 0 ? null : b2PdfFileName,
         fileName: pdfParts.length > 0 ? null : b2PdfFileName,
         storage: {
-          cover: {
+          cover: cloudinaryCoverUrl ? {
             provider: 'cloudinary',
-            url: cloudinaryCoverUrl,
-            publicId: cloudinaryResult.public_id
+            url: cloudinaryCoverUrl
+          } : {
+            provider: 'local',
+            url: coverImageUrl
           },
           pdf: {
-            provider: 'backblaze',
-            path: pdfParts.length > 0 ? 
-              pdfParts.map(p => p.b2FileName) : 
-              b2PdfFileName
+            provider: hasB2Credentials ? 'backblaze' : 'none',
+            path: pdfParts.length > 0 ? pdfParts.map(p => p.b2FileName) : b2PdfFileName
           }
         },
         createdAt: new Date().toISOString(),
@@ -812,11 +806,23 @@ app.put(
         let cloudinaryCoverUrl = null;
         // Upload new cover to Cloudinary
         try {
-          const result = await uploadBufferToCloudinary(imageFile.buffer, {
-            resource_type: 'image',
-            folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/covers',
-            public_id: sanitizedImageName.replace(/\.[^.]+$/, '')
+          // Use stream upload to avoid timestamp issues
+          const result = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+              {
+                resource_type: 'image',
+                folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/covers',
+                public_id: sanitizedImageName.replace(/\.[^.]+$/, ''),
+                timestamp: Math.floor((Date.now() + timeOffset) / 1000) // Use synced time
+              },
+              (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+              }
+            );
+            uploadStream.end(imageFile.buffer);
           });
+
           if (result && result.secure_url) {
             cloudinaryCoverUrl = result.secure_url;
             console.log('✅ Uploaded updated cover image to Cloudinary:', cloudinaryCoverUrl);
@@ -1009,115 +1015,66 @@ app.get('/api/books/:id/download', async (req, res) => {
     try {
       // Ensure B2 is authorized
       await ensureB2Authorized();
-      console.log('B2 authorized successfully');
       
-      // Try to use cached fileId first
-      let fileInfo = null;
-      let fileId = book.b2FileId || null;
-
-      if (!fileId) {
-        console.log('No cached fileId, listing bucket to find file:', fileName);
-        const allFilesResponse = await b2.listFileNames({
-          bucketId: process.env.B2_BUCKET_ID,
-          startFileName: '',
-          maxFileCount: 10000
-        });
-
-        if (!allFilesResponse || !allFilesResponse.data) {
-          throw new Error('Failed to list files from Backblaze');
-        }
-
-        const allFiles = allFilesResponse.data.files || [];
-        console.log(`Found ${allFiles.length} total files in bucket`);
-
-        // Try exact match first
-        fileInfo = allFiles.find(f => f.fileName === fileName);
-
-        // If not found, try case-insensitive match
-        if (!fileInfo) {
-          fileInfo = allFiles.find(f => f.fileName.toLowerCase() === fileName.toLowerCase());
-        }
-
-        // If still not found, try partial matches
-        if (!fileInfo) {
-          fileInfo = allFiles.find(f =>
-            f.fileName.includes(fileName) ||
-            fileName.includes(f.fileName) ||
-            f.fileName.endsWith(fileName) ||
-            fileName.endsWith(f.fileName)
-          );
-        }
-
-        if (fileInfo) {
-          fileId = fileInfo.fileId;
-          console.log('✅ Found file in B2!');
-          console.log('   FileId:', fileId);
-          console.log('   FileName in B2:', fileInfo.fileName);
-        } else {
-          throw new Error(`File "${fileName}" not found in Backblaze bucket`);
-        }
-      } else {
-        console.log('Using cached B2 fileId for fast fetch:', fileId);
-        fileInfo = { fileName };
-      }
-      
-      // Download file from B2
-      console.log('Downloading file using fileId:', fileId);
-      
-      const downloadResponse = await b2.downloadFileById({
-        fileId: fileId,
-        responseType: 'arraybuffer'
+      // Generate signed URL for download to stream it
+      const authResponse = await b2.getDownloadAuthorization({
+        bucketId: process.env.B2_BUCKET_ID,
+        fileNamePrefix: fileName,
+        validDurationInSeconds: 3600,
+        b2ContentDisposition: `attachment; filename="${encodeURIComponent(downloadFileName)}"`
       });
       
-      console.log('✅ downloadFileById completed');
+      const token = authResponse?.data?.authorizationToken;
+      const baseUrl = getB2DownloadBaseUrl();
       
-      // Extract file data from response
-      let fileData = null;
-      
-      if (downloadResponse?.data !== undefined) {
-        const responseData = downloadResponse.data;
-        
-        if (Buffer.isBuffer(responseData)) {
-          fileData = responseData;
-        } else if (responseData instanceof ArrayBuffer) {
-          fileData = Buffer.from(responseData);
-        } else if (typeof responseData === 'string') {
-          if (responseData.trim().startsWith('{') || responseData.trim().startsWith('[')) {
-            throw new Error('Received JSON response instead of PDF data');
-          }
-          fileData = Buffer.from(responseData, 'binary');
-        } else {
-          fileData = Buffer.from(responseData);
-        }
-      } else if (Buffer.isBuffer(downloadResponse)) {
-        fileData = downloadResponse;
-      } else if (downloadResponse instanceof ArrayBuffer) {
-        fileData = Buffer.from(downloadResponse);
-      } else {
-        fileData = Buffer.from(downloadResponse);
+      if (!token || !baseUrl) {
+        throw new Error('Failed to generate B2 download token');
       }
       
-      if (!fileData || !Buffer.isBuffer(fileData)) {
-        throw new Error('No valid file data received from B2');
-      }
+      const encodedPath = encodeB2Path(fileName);
+      const bucketName = process.env.B2_BUCKET_NAME;
+      const signedUrl = `${baseUrl}/file/${bucketName}/${encodedPath}?Authorization=${encodeURIComponent(token)}`;
+
+      console.log('🔄 Proxying download stream from B2:', fileName);
       
-      // Validate PDF: Check for PDF magic bytes
-      const pdfMagicBytes = fileData.slice(0, 4).toString('ascii');
-      if (pdfMagicBytes !== '%PDF') {
-        console.error('❌ Invalid PDF: Magic bytes are:', pdfMagicBytes);
-        throw new Error('Downloaded file is not a valid PDF');
-      }
-      
-      // Send the file with download headers
-      console.log('✅ Sending PDF for download, size:', fileData.length, 'bytes');
+      const b2Response = await axios({
+        method: 'GET',
+        url: signedUrl,
+        responseType: 'stream'
+      });
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(downloadFileName)}"`);
-      res.send(fileData);
-      console.log('✅ PDF download sent successfully');
+      
+      if (b2Response.headers['content-length']) {
+        res.setHeader('Content-Length', b2Response.headers['content-length']);
+      }
+      
+      b2Response.data.pipe(res);
+      
+      b2Response.data.on('error', (err) => {
+        console.error('Stream error:', err);
+        if (!res.headersSent) {
+          // If headers aren't sent, we can send JSON error. 
+          // If they are, the stream will just cut off (browser will see network error).
+        }
+      });
       
     } catch (downloadError) {
       console.error('❌ Error downloading PDF:', downloadError.message);
-      throw new Error(`Failed to download PDF: ${downloadError.message || 'Unknown error'}`);
+      // Fallback to searching if file not found by exact name (legacy logic)
+      if (downloadError.response?.status === 404 || downloadError.message.includes('not found')) {
+         console.log('⚠️  File not found by exact name, attempting legacy search...');
+         // We could implement the legacy search here if needed, but for now error out.
+         // Most files should be found by exact name if uploaded via this app.
+      }
+      
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          error: 'Failed to download PDF', 
+          details: downloadError.message || 'Unknown error'
+        });
+      }
     }
   } catch (error) {
     console.error('❌ Error in download process:', error);
@@ -1276,9 +1233,10 @@ app.get('/api/books/:id/pdf', async (req, res) => {
       await ensureB2Authorized();
       
       // Generate a signed URL that's valid for 1 hour
+      // Use empty prefix to allow access to any file (simplifies auth logic, safe since we proxy)
       const authResponse = await b2.getDownloadAuthorization({
         bucketId: process.env.B2_BUCKET_ID,
-        fileNamePrefix: fileName,
+        fileNamePrefix: '',
         validDurationInSeconds: 3600, // 1 hour
         b2ContentDisposition: `attachment; filename="${book.title || 'book'}.pdf"`
       });
@@ -1290,16 +1248,59 @@ app.get('/api/books/:id/pdf', async (req, res) => {
         throw new Error('Failed to generate signed URL');
       }
       
+      if (!process.env.B2_BUCKET_NAME) {
+         throw new Error('B2_BUCKET_NAME is not defined in environment variables');
+      }
+
       const encodedPath = encodeB2Path(fileName);
       const bucketName = process.env.B2_BUCKET_NAME;
       const signedUrl = `${baseUrl}/file/${bucketName}/${encodedPath}?Authorization=${encodeURIComponent(token)}`;
       
-      console.log(`✅ Generated signed URL for ${fileName} (${Date.now() - startTime}ms)`);
+      console.log(`✅ Generated signed URL for ${fileName}`);
       
-      // Redirect to the signed URL
-      return res.redirect(302, signedUrl);
+      // Stream the file content through the server to avoid CORS
+      console.log('🔄 Proxying file stream from B2...');
+      
+      const b2Response = await axios({
+        method: 'GET',
+        url: signedUrl,
+        responseType: 'stream',
+        validateStatus: function (status) {
+          return status >= 200 && status < 300; // Only accept successful responses
+        }
+      });
+
+      // Set headers
+      res.setHeader('Content-Type', 'application/pdf');
+      if (b2Response.headers['content-length']) {
+        res.setHeader('Content-Length', b2Response.headers['content-length']);
+      }
+      if (b2Response.headers['last-modified']) {
+        res.setHeader('Last-Modified', b2Response.headers['last-modified']);
+      }
+      if (b2Response.headers['etag']) {
+        res.setHeader('ETag', b2Response.headers['etag']);
+      }
+      
+      // Pipe the stream
+      b2Response.data.pipe(res);
+      
+      b2Response.data.on('error', (err) => {
+        console.error('Stream error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Stream error' });
+        }
+      });
+
     } catch (error) {
-      console.error('❌ Error generating signed URL:', error);
+      if (error.response && error.response.status === 401) {
+        console.error('❌ B2 Auth Error (401): Token expired or invalid. Re-authorizing...');
+        // Force re-authorization for next time
+        b2Authorized = false; 
+        return res.status(500).json({ error: 'B2 Authorization failed, please try again' });
+      }
+      
+      console.error('❌ Error generating signed URL:', error.message);
       return res.status(500).json({ 
         error: 'Failed to generate download URL',
         details: process.env.NODE_ENV === 'development' ? error.message : undefined
@@ -1500,7 +1501,7 @@ app.get('/api/test/b2', async (req, res) => {
   }
 });
 
-// Image proxy endpoint (for cover images stored in Backblaze)
+// Image proxy endpoint (for cover images stored in Backblaze or Cloudinary)
 app.get('/api/books/:id/cover', async (req, res) => {
   try {
     const books = await getBooks();
@@ -1510,21 +1511,67 @@ app.get('/api/books/:id/cover', async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
     
-    // Cover images are stored in Cloudinary - redirect to Cloudinary URL
+    // 1. If it's a Cloudinary URL or generic URL, redirect
     const coverImageUrl = book.cloudinaryCoverUrl || book.coverImage;
-    
     if (coverImageUrl && (coverImageUrl.startsWith('http://') || coverImageUrl.startsWith('https://'))) {
-      // Redirect to Cloudinary URL
-      console.log('✅ Redirecting to Cloudinary cover image:', coverImageUrl);
+      // If it's a Backblaze URL, we might want to proxy it too if it's private,
+      // but usually Cloudinary/external URLs are public.
+      console.log('✅ Redirecting to cover image:', coverImageUrl);
       return res.redirect(coverImageUrl);
+    }
+
+    // 2. If it's a B2 file name (no protocol), stream it from B2
+    if (book.b2CoverFileName || (book.coverImage && !book.coverImage.startsWith('/'))) {
+      const fileName = book.b2CoverFileName || book.coverImage;
+      console.log(`🔄 Proxying cover image from B2: ${fileName}`);
+
+      await ensureB2Authorized();
+      
+      // Get download authorization (signed URL)
+      // Use empty prefix to avoid mismatch errors
+      const auth = await b2.getDownloadAuthorization({
+        bucketId: process.env.B2_BUCKET_ID,
+        fileNamePrefix: '',
+        validDurationInSeconds: CDN_URL_TTL_SECONDS
+      });
+      
+      const token = auth.data.authorizationToken;
+      const baseUrl = getB2DownloadBaseUrl();
+      const encodedPath = encodeB2Path(fileName);
+      const signedUrl = `${baseUrl}/file/${process.env.B2_BUCKET_NAME}/${encodedPath}?Authorization=${encodeURIComponent(token)}`;
+      
+      // Stream the file content
+      const b2Response = await axios({
+        method: 'GET',
+        url: signedUrl,
+        responseType: 'stream'
+      });
+      
+      res.setHeader('Content-Type', b2Response.headers['content-type'] || 'image/jpeg');
+      if (b2Response.headers['content-length']) {
+        res.setHeader('Content-Length', b2Response.headers['content-length']);
+      }
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+      
+      b2Response.data.pipe(res);
+      return;
+    }
+    
+    // 3. Fallback for local files (if any legacy ones exist)
+    if (book.coverImage && book.coverImage.startsWith('/uploads')) {
+       // This should be handled by the static middleware, but just in case
+       return res.redirect(book.coverImage);
     }
     
     // No cover image available
-    console.error('❌ Cover image not found for book:', book.id, 'coverImage:', book.coverImage);
+    console.error('❌ Cover image not found for book:', book.id);
     return res.status(404).json({ error: 'Cover image not found' });
   } catch (error) {
     console.error('Error serving cover image:', error);
-    res.status(500).json({ error: 'Failed to serve cover image' });
+    // If headers already sent (streaming started), we can't send JSON
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to serve cover image' });
+    }
   }
 });
 

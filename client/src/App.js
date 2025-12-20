@@ -7,7 +7,7 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import BookDetail from './pages/BookDetail';
 import BlogDetail from './pages/BlogDetail';
-import Reader from './pages/Reader';
+import B2Reader from './pages/B2Reader';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
 import Category from './pages/Category';
@@ -77,7 +77,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/book/:id" element={<BookDetail />} />
           <Route path="/blog/:id" element={<BlogDetail />} />
-          <Route path="/read/:id" element={<Reader />} />
+          <Route path="/read/:id" element={<B2Reader />} />
           <Route 
             path="/login" 
             element={user ? <Navigate to="/" /> : <Login />} 
