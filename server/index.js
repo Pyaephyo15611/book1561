@@ -866,9 +866,95 @@ app.delete('/api/admin/books/:id', verifyAdminPassword, async (req, res) => {
     if (index === -1) {
       return res.status(404).json({ error: 'Book not found' });
     }
+
+    const book = books[index];
+
+    // Attempt to delete B2 files associated with this book
+    const b2Result = { attempted: [], deleted: [], errors: [] };
+    if (hasB2Credentials) {
+      try {
+        await ensureB2Authorized();
+
+        // Helper to delete by filename
+        const deleteByFileName = async (fileName) => {
+          if (!fileName) return;
+          try {
+            const listResp = await b2.listFileNames({
+              bucketId: process.env.B2_BUCKET_ID,
+              startFileName: fileName,
+              maxFileCount: 10
+            });
+            const file = listResp?.data?.files?.find((f) => f.fileName === fileName);
+            b2Result.attempted.push(fileName);
+            if (file) {
+              await b2.deleteFileVersion({ fileId: file.fileId, fileName: file.fileName });
+              b2Result.deleted.push(fileName);
+              console.log('🗑️  Deleted from B2:', file.fileName);
+            } else {
+              b2Result.errors.push({ fileName, error: 'Not found in B2' });
+              console.warn('⚠️  B2 file not found for delete:', fileName);
+            }
+          } catch (e) {
+            b2Result.errors.push({ fileName, error: e.message || String(e) });
+            console.error('❌ B2 delete error for', fileName, e.message || e);
+          }
+        };
+
+        // Single-file books
+        await deleteByFileName(book.b2FileName || book.fileName);
+
+        // Parts (comics)
+        if (Array.isArray(book.pdfParts)) {
+          for (const part of book.pdfParts) {
+            await deleteByFileName(part?.b2FileName || part?.fileName);
+          }
+        }
+
+        // Optional: cleanup folder prefix books/{bookId}/
+        const prefix = `books/${book.id}/`;
+        try {
+          let startFileName = prefix;
+          let finished = false;
+          while (!finished) {
+            const resp = await b2.listFileNames({
+              bucketId: process.env.B2_BUCKET_ID,
+              startFileName,
+              maxFileCount: 1000
+            });
+            const files = (resp?.data?.files || []).filter(f => f.fileName.startsWith(prefix));
+            if (files.length === 0) {
+              finished = true;
+              break;
+            }
+            for (const f of files) {
+              try {
+                await b2.deleteFileVersion({ fileId: f.fileId, fileName: f.fileName });
+                b2Result.deleted.push(f.fileName);
+                console.log('🗑️  Deleted from B2 (prefix sweep):', f.fileName);
+              } catch (e) {
+                b2Result.errors.push({ fileName: f.fileName, error: e.message || String(e) });
+                console.error('❌ B2 delete error (prefix sweep):', f.fileName, e.message || e);
+              }
+            }
+            finished = !resp?.data?.nextFileName;
+            startFileName = resp?.data?.nextFileName || '';
+            if (startFileName && !startFileName.startsWith(prefix)) finished = true;
+          }
+        } catch (e) {
+          console.warn('⚠️  Prefix sweep skipped/failed:', e.message || e);
+        }
+      } catch (authErr) {
+        console.warn('⚠️  Skipping B2 deletion (auth failed):', authErr.message || authErr);
+      }
+    } else {
+      console.warn('⚠️  B2 not configured, skipping remote delete');
+    }
+
+    // Remove from local store
     const [deleted] = books.splice(index, 1);
     await saveBooks(books);
-    res.json({ success: true, deletedId: deleted.id });
+
+    res.json({ success: true, deletedId: deleted.id, b2: b2Result });
   } catch (error) {
     console.error('Error deleting book:', error);
     res.status(500).json({ error: error.message || 'Failed to delete book' });
@@ -1061,19 +1147,57 @@ app.get('/api/books/:id/download', async (req, res) => {
       });
       
     } catch (downloadError) {
-      console.error('❌ Error downloading PDF:', downloadError.message);
-      // Fallback to searching if file not found by exact name (legacy logic)
-      if (downloadError.response?.status === 404 || downloadError.message.includes('not found')) {
-         console.log('⚠️  File not found by exact name, attempting legacy search...');
-         // We could implement the legacy search here if needed, but for now error out.
-         // Most files should be found by exact name if uploaded via this app.
-      }
-      
-      if (!res.headersSent) {
-        res.status(500).json({ 
-          error: 'Failed to download PDF', 
-          details: downloadError.message || 'Unknown error'
+      console.error('❌ Error downloading PDF (signed URL):', downloadError.message);
+
+      // Fallback: stream using Backblaze download by fileId (supports Range)
+      try {
+        await ensureB2Authorized();
+        const listResp = await b2.listFileNames({
+          bucketId: process.env.B2_BUCKET_ID,
+          startFileName: fileName,
+          maxFileCount: 1
         });
+        const fileInfo = listResp?.data?.files?.find(f => f.fileName === fileName);
+        if (!fileInfo) {
+          return res.status(404).json({ error: 'File not found in Backblaze' });
+        }
+
+        if (!b2AuthData?.downloadUrl || !b2AuthData?.authorizationToken) {
+          return res.status(500).json({ error: 'Missing B2 auth data for direct download' });
+        }
+
+        const directUrl = `${b2AuthData.downloadUrl}/b2api/v2/b2_download_file_by_id?fileId=${encodeURIComponent(fileInfo.fileId)}`;
+        const headers = { Authorization: b2AuthData.authorizationToken };
+        if (req.headers.range) headers.Range = req.headers.range;
+
+        const b2Resp = await axios({
+          method: 'GET',
+          url: directUrl,
+          responseType: 'stream',
+          headers,
+          validateStatus: (s) => s >= 200 && s < 300
+        });
+
+        // Mirror headers and status; add attachment disposition
+        if (!res.headersSent) {
+          res.status(b2Resp.status);
+          if (b2Resp.headers['content-type']) res.setHeader('Content-Type', b2Resp.headers['content-type']);
+          if (b2Resp.headers['content-length']) res.setHeader('Content-Length', b2Resp.headers['content-length']);
+          if (b2Resp.headers['content-range']) res.setHeader('Content-Range', b2Resp.headers['content-range']);
+          if (b2Resp.headers['accept-ranges']) res.setHeader('Accept-Ranges', b2Resp.headers['accept-ranges']);
+          if (b2Resp.headers['last-modified']) res.setHeader('Last-Modified', b2Resp.headers['last-modified']);
+          if (b2Resp.headers['etag']) res.setHeader('ETag', b2Resp.headers['etag']);
+          res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(downloadFileName)}"`);
+        }
+        b2Resp.data.pipe(res);
+      } catch (fallbackErr) {
+        console.error('❌ Fallback (fileId) download failed:', fallbackErr.message);
+        if (!res.headersSent) {
+          res.status(500).json({ 
+            error: 'Failed to download PDF', 
+            details: fallbackErr.message || 'Unknown error' 
+          });
+        }
       }
     }
   } catch (error) {

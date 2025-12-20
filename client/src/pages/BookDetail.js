@@ -658,14 +658,18 @@ const BookDetail = () => {
                   )}
                 </button>
               )}
-              <button
-                className="cta cta-outline"
-                type="button"
-                onClick={() => navigate(`/read/${id}`)}
-              >
-                Read Online
-              </button>
-            </div>
+
+              {/* Conditionally restore Read Online when PDF exists */}
+              {(pdfParts?.length > 0 || book?.b2FileName || book?.fileName) && (
+                <button
+                  className="cta cta-outline"
+                  type="button"
+                  onClick={() => navigate(`/read/${id}`)}
+                >
+                  Read Online
+                </button>
+              )}
+                          </div>
 
             <div className="availability-note">
               <Info size={16} />

@@ -1,0 +1,110 @@
+/* B2Reader horizontal layout and responsive styles */
+.b2reader-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #202225;
+}
+
+.b2reader-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #2c2f33;
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.b2reader-topbar .back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #3b3f45;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.b2reader-topbar .back-btn:hover { background: #464b52; }
+
+.topbar-title {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zoom-btn {
+  background: #3b3f45;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+}
+.zoom-btn:hover { background: #464b52; }
+
+.zoom-percent { min-width: 3ch; text-align: right; }
+
+.b2reader-scroller {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  background: #202225;
+}
+
+.b2reader-document {
+  display: inline-flex;
+  gap: 16px;
+}
+
+.b2reader-page {
+  position: relative;
+  background: #2f3136;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.b2reader-page canvas {
+  display: block;
+  height: auto !important;
+  max-height: calc(100vh - 140px);
+  width: auto !important;
+}
+
+.page-label {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .b2reader-topbar { padding: 8px 10px; }
+  .zoom-percent { display: none; }
+  .b2reader-page canvas { max-height: calc(100vh - 120px); }
+}
