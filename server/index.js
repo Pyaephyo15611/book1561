@@ -1296,15 +1296,60 @@ app.get('/api/books/:id/pdf', async (req, res) => {
       if (error.response && error.response.status === 401) {
         console.error('❌ B2 Auth Error (401): Token expired or invalid. Re-authorizing...');
         // Force re-authorization for next time
-        b2Authorized = false; 
-        return res.status(500).json({ error: 'B2 Authorization failed, please try again' });
+        b2Authorized = false;
+      } else {
+        console.error('❌ Error generating signed URL:', error.message);
       }
-      
-      console.error('❌ Error generating signed URL:', error.message);
-      return res.status(500).json({ 
-        error: 'Failed to generate download URL',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
+
+      // Fallback: stream using b2_download_file_by_id (supports Range)
+      try {
+        await ensureB2Authorized();
+        const listResp = await b2.listFileNames({
+          bucketId: process.env.B2_BUCKET_ID,
+          startFileName: fileName,
+          maxFileCount: 1
+        });
+        const fileInfo = listResp?.data?.files?.find(f => f.fileName === fileName);
+        if (!fileInfo) {
+          return res.status(404).json({ error: 'File not found in Backblaze' });
+        }
+
+        if (!b2AuthData?.downloadUrl || !b2AuthData?.authorizationToken) {
+          return res.status(500).json({ error: 'Missing B2 auth data for direct download' });
+        }
+
+        const directUrl = `${b2AuthData.downloadUrl}/b2api/v2/b2_download_file_by_id?fileId=${encodeURIComponent(fileInfo.fileId)}`;
+        const headers = { Authorization: b2AuthData.authorizationToken };
+        if (req.headers.range) headers.Range = req.headers.range;
+
+        const b2Resp = await axios({
+          method: 'GET',
+          url: directUrl,
+          responseType: 'stream',
+          headers,
+          validateStatus: (s) => s >= 200 && s < 300
+        });
+
+        // Mirror status and relevant headers (support partial content)
+        if (!res.headersSent) {
+          res.status(b2Resp.status);
+          if (b2Resp.headers['content-type']) res.setHeader('Content-Type', b2Resp.headers['content-type']);
+          if (b2Resp.headers['content-length']) res.setHeader('Content-Length', b2Resp.headers['content-length']);
+          if (b2Resp.headers['content-range']) res.setHeader('Content-Range', b2Resp.headers['content-range']);
+          if (b2Resp.headers['accept-ranges']) res.setHeader('Accept-Ranges', b2Resp.headers['accept-ranges']);
+          if (b2Resp.headers['last-modified']) res.setHeader('Last-Modified', b2Resp.headers['last-modified']);
+          if (b2Resp.headers['etag']) res.setHeader('ETag', b2Resp.headers['etag']);
+        }
+        b2Resp.data.pipe(res);
+      } catch (fallbackErr) {
+        console.error('❌ Fallback streaming failed:', fallbackErr.message);
+        if (!res.headersSent) {
+          return res.status(500).json({ 
+            error: 'Failed to stream PDF',
+            details: process.env.NODE_ENV === 'development' ? fallbackErr.message : undefined
+          });
+        }
+      }
     }
   } catch (error) {
     console.error('❌ Error processing PDF request:', error);
