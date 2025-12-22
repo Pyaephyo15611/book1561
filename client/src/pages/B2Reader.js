@@ -15,7 +15,6 @@ const B2Reader = () => {
   const navigate = useNavigate();
 
   const [numPages, setNumPages] = useState(null);
-  const [scale, setScale] = useState(1.0);
   const [, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [bookTitle, setBookTitle] = useState('Loading...');
