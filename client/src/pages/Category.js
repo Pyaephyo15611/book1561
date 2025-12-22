@@ -5,12 +5,16 @@ import { BookOpen, ArrowLeft } from 'lucide-react';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import { API_URL } from '../utils/apiConfig';
 import './Home.css';
+import './Category.css';
 
 const Category = () => {
   const { name } = useParams();
   const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState('recent');
+  const [view, setView] = useState('grid');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -26,22 +30,72 @@ const Category = () => {
     fetchBooks();
   }, []);
 
-  const filtered = books.filter(
-    (b) => (b.category || '').toLowerCase() === decodeURIComponent(name || '').toLowerCase()
-  );
+  const filtered = books
+    .filter((b) => (b.category || '').toLowerCase() === decodeURIComponent(name || '').toLowerCase())
+    .filter((b) => {
+      if (!query.trim()) return true;
+      const q = query.toLowerCase();
+      return (
+        b.title?.toLowerCase().includes(q) ||
+        b.author?.toLowerCase().includes(q) ||
+        b.description?.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'title':
+          return (a.title || '').localeCompare(b.title || '');
+        case 'author':
+          return (a.author || '').localeCompare(b.author || '');
+        case 'recent':
+        default:
+          return 0;
+      }
+    });
 
   return (
     <div className="home-page">
       <main className="main-content">
         <section className="section">
           <div className="container">
-            <div className="section-header category-header">
-              <button className="btn btn-outline" onClick={() => navigate(-1)}>
-                <ArrowLeft size={18} /> Back
-              </button>
-              <div>
-                <span className="section-eyebrow">Category</span>
-                <h2 className="section-title">{decodeURIComponent(name || '')}</h2>
+            <div className="cat-header">
+              <div className="cat-title">
+                <button className="btn btn-outline" onClick={() => navigate(-1)}>
+                  <ArrowLeft size={18} /> Back
+                </button>
+                <div>
+                  <span className="section-eyebrow">Category</span>
+                  <h2 className="section-title">{decodeURIComponent(name || '')}</h2>
+                </div>
+              </div>
+              <div className="cat-actions">
+                <div className="cat-search">
+                  <input
+                    type="text"
+                    placeholder="Search in this category..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                <div className="cat-filters">
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                    <option value="recent">Most recent</option>
+                    <option value="title">Title A–Z</option>
+                    <option value="author">Author A–Z</option>
+                  </select>
+                  <div className="view-toggle">
+                    <button
+                      className={view === 'grid' ? 'active' : ''}
+                      onClick={() => setView('grid')}
+                      aria-label="Grid view"
+                    >▦</button>
+                    <button
+                      className={view === 'list' ? 'active' : ''}
+                      onClick={() => setView('list')}
+                      aria-label="List view"
+                    >≣</button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -57,37 +111,39 @@ const Category = () => {
                 <p>No books in this category yet.</p>
               </div>
             ) : (
-              <div className="trending-grid">
+              <div className={view === 'grid' ? 'cat-grid' : 'cat-list'}>
                 {filtered.map((book) => (
                   <div
                     key={book.id}
-                    className="trending-card"
+                    className="cat-card"
                     onClick={() => navigate(`/book/${book.id}`)}
-                    style={{ cursor: 'pointer' }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/book/${book.id}`)}
                   >
-                    <div className="trending-cover">
+                    <div className="cat-cover">
                       <img
                         src={getCoverImageUrl(book)}
                         alt={book.title}
+                        loading="lazy"
                         onError={(e) => {
                           e.target.onerror = null;
                           e.target.src = getDefaultCoverImage(book);
                         }}
                       />
                     </div>
-                    <p className="trending-book-title">{book.title || 'Untitled'}</p>
-                    <p 
-                      className="trending-book-author"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (book.author) {
-                          navigate(`/author/${encodeURIComponent(book.author)}`);
-                        }
-                      }}
-                      style={{ cursor: book.author ? 'pointer' : 'default' }}
-                    >
-                      {book.author || 'Unknown Author'}
-                    </p>
+                    <div className="cat-meta">
+                      <h3 className="cat-title-text">{book.title || 'Untitled'}</h3>
+                      <button
+                        className="cat-author"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (book.author) navigate(`/author/${encodeURIComponent(book.author)}`);
+                        }}
+                      >
+                        {book.author || 'Unknown Author'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

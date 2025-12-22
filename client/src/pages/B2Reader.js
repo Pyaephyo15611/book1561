@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { ArrowLeft, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import { API_URL } from '../utils/apiConfig';
 import './BookDetail.css';
@@ -20,6 +20,8 @@ const B2Reader = () => {
   const [error, setError] = useState(null);
   const [bookTitle, setBookTitle] = useState('Loading...');
   const [pdfUrl, setPdfUrl] = useState('');
+  const [pageInput, setPageInput] = useState('');
+  const pageRefs = useRef([]);
 
   // Fetch book details for title
   useEffect(() => {
@@ -64,6 +66,17 @@ const B2Reader = () => {
     setLoading(false);
   }
 
+  function handleJumpToPage() {
+    if (!numPages) return;
+    const raw = parseInt(pageInput, 10);
+    if (isNaN(raw)) return;
+    const target = Math.min(Math.max(raw, 1), numPages);
+    const el = pageRefs.current[target - 1];
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }
+
   return (
     <div className="b2reader-root">
       {/* Top bar */}
@@ -74,15 +87,21 @@ const B2Reader = () => {
         </button>
         <div className="topbar-title" title={bookTitle}>{bookTitle}</div>
         <div className="topbar-actions">
-          <button onClick={() => setScale((s) => Math.max(0.5, s - 0.1))} className="zoom-btn" title="Zoom Out">
-            <ZoomOut size={18} />
-          </button>
-          <span className="zoom-percent">{Math.round(scale * 100)}%</span>
-          <button onClick={() => setScale((s) => Math.min(2.0, s + 0.1))} className="zoom-btn" title="Zoom In">
-            <ZoomIn size={18} />
-          </button>
-          <button onClick={() => setScale(1.0)} className="zoom-btn" title="Reset Zoom">
-            <RotateCcw size={18} />
+          <input
+            type="number"
+            className="jump-input"
+            placeholder={numPages ? `1 - ${numPages}` : 'Page #'}
+            min={1}
+            max={numPages || undefined}
+            value={pageInput}
+            onChange={(e) => setPageInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleJumpToPage();
+            }}
+            aria-label="Page number"
+          />
+          <button className="jump-btn" onClick={handleJumpToPage} title="Jump to page">
+            Jump
           </button>
         </div>
       </div>
@@ -113,7 +132,11 @@ const B2Reader = () => {
             className="b2reader-document"
           >
             {Array.from(new Array(numPages || 0), (el, index) => (
-              <div key={`page_${index + 1}`} className="b2reader-page">
+              <div
+                key={`page_${index + 1}`}
+                className="b2reader-page"
+                ref={(el) => (pageRefs.current[index] = el)}
+              >
                 <Page
                   pageNumber={index + 1}
                   scale={scale}

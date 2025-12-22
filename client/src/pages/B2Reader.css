@@ -48,17 +48,27 @@
   gap: 8px;
 }
 
-.zoom-btn {
+.jump-input {
+  width: 90px;
   background: #3b3f45;
   color: #fff;
   border: none;
   border-radius: 6px;
-  padding: 6px;
+  padding: 6px 8px;
+}
+
+.jump-btn {
+  background: #3b3f45;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
   cursor: pointer;
 }
-.zoom-btn:hover { background: #464b52; }
+.jump-btn:hover { background: #464b52; }
 
-.zoom-percent { min-width: 3ch; text-align: right; }
+/* removed zoom controls */
+.zoom-percent { display: none; }
 
 .b2reader-scroller {
   flex: 1;

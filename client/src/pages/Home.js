@@ -281,14 +281,7 @@ const Home = () => {
                 Search
               </button>
             </form>
-            <div className="trending-tags">
-              <span>Trending now:</span>
-              <button type="button" onClick={() => navigate('/category/Fantasy')}>Fantasy</button>
-              <button type="button" onClick={() => navigate('/category/Romance')}>Romance</button>
-              <button type="button" onClick={() => navigate('/category/Mystery')}>Mystery</button>
-              <button type="button" onClick={() => navigate('/category/Biography')}>Biography</button>
-            </div>
-          </div>
+                      </div>
         </section>
 
         {/* News Books Section with horizontal scroll */}
@@ -342,9 +335,12 @@ const Home = () => {
             ) : (
               <div className="news-books-scroll" ref={newsBooksScrollRef}>
                 <div className="news-books-container">
-                  {displayBooks.slice(0, 12).map((book, index) => (
+                  {displayBooks
+                    .slice(0, 12)
+                    .filter((book) => book && book.id)
+                    .map((book, index) => (
                     <motion.div
-                      key={book.id || index}
+                      key={book.id}
                       className="news-book-card"
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}

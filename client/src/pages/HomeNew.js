@@ -409,14 +409,7 @@ const Home = () => {
                 />
                 <button className="search-btn">Search</button>
               </div>
-              <div className="trending-tags">
-                <span>Trending:</span>
-                <a href="#fiction">Fiction</a>
-                <a href="#romance">Romance</a>
-                <a href="#thriller">Thriller</a>
-                <a href="#biography">Biography</a>
-              </div>
-            </div>
+                          </div>
           </motion.div>
         </div>
       </header>
