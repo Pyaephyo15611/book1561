@@ -364,65 +364,113 @@ async function downloadBooksJsonFromB2() {
 
 // Helper functions for books - use Backblaze B2 for persistence
 async function getBooks() {
-  // Try to load from local books.json first
-  let books = [];
+  // Build book list dynamically from Cloudinary (covers) and Backblaze B2 (PDFs)
+  const result = [];
+
+  if (!hasCloudinaryCredentials) {
+    console.warn('⚠️ Cloudinary not configured; cannot list books without books.json. Returning empty list.');
+    return result;
+  }
+
   try {
-    const data = await fs.readFile(BOOKS_FILE, 'utf8');
-    books = JSON.parse(data);
-    if (books.length > 0) {
-      console.log(`📚 Loaded ${books.length} books from local books.json`);
-      return books;
+    // Determine covers folder used when uploading (see POST /api/admin/books)
+    const coversFolder = (process.env.CLOUDINARY_FOLDER ? `${process.env.CLOUDINARY_FOLDER}/book-covers` : 'bookstore/book-covers');
+
+    // List cover assets; each cover is uploaded with public_id like `${coversFolder}/cover-${bookId}`
+    const resourcesResp = await cloudinary.api.resources({
+      type: 'upload',
+      prefix: `${coversFolder}/cover-`,
+      max_results: 500
+    });
+
+    const covers = resourcesResp?.resources || [];
+
+    // For each cover, derive bookId and then discover PDFs on B2 by prefix
+    for (const r of covers) {
+      const publicId = r.public_id; // e.g., bookstore/book-covers/cover-<bookId>
+      const lastSegment = publicId.split('/').pop();
+      const bookId = lastSegment.startsWith('cover-') ? lastSegment.substring('cover-'.length) : lastSegment;
+
+      // Read metadata from Cloudinary context if available
+      const ctx = (r.context && r.context.custom) ? r.context.custom : {};
+      const title = ctx.title || '';
+      const author = ctx.author || '';
+      const description = ctx.description || '';
+      const category = ctx.category || 'General';
+      const readingTime = ctx.readingTime || 'Flexible';
+      const rating = ctx.rating ? Number(ctx.rating) : 0;
+      const isTrending = ctx.isTrending === 'true' || ctx.isTrending === true;
+
+      // Discover PDFs on Backblaze
+      let b2FileName = null;
+      let pdfParts = null;
+      if (hasB2Credentials) {
+        try {
+          await ensureB2Authorized();
+          const prefix = `books/${bookId}/`;
+          let startFileName = prefix;
+          let done = false;
+          const files = [];
+          while (!done) {
+            const resp = await b2.listFileNames({
+              bucketId: process.env.B2_BUCKET_ID,
+              startFileName,
+              maxFileCount: 1000
+            });
+            const batch = resp?.data?.files || [];
+            for (const f of batch) {
+              if (f.fileName.startsWith(prefix)) files.push(f);
+            }
+            startFileName = resp?.data?.nextFileName || '';
+            done = !startFileName || !startFileName.startsWith(prefix);
+          }
+
+          const partFiles = files.filter(f => f.fileName.includes('/parts/') && f.fileName.toLowerCase().endsWith('.pdf'))
+                                 .sort((a, b) => a.fileName.localeCompare(b.fileName));
+          if (partFiles.length > 0) {
+            let partNumber = 1;
+            pdfParts = partFiles.map(f => ({
+              partNumber: partNumber++,
+              b2FileName: f.fileName,
+              fileName: f.fileName
+            }));
+          } else {
+            const single = files.find(f => f.fileName.toLowerCase().endsWith('.pdf'));
+            if (single) b2FileName = single.fileName;
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to list PDFs on B2 for', bookId, e.message || e);
+        }
+      }
+
+      result.push({
+        id: bookId,
+        title,
+        author,
+        description,
+        category,
+        readingTime,
+        rating,
+        isTrending,
+        createdAt: r.created_at || null,
+        updatedAt: r.created_at || null,
+        coverImage: r.secure_url,
+        cloudinaryCoverUrl: r.secure_url,
+        b2FileName,
+        pdfParts
+      });
     }
-  } catch (error) {
-    // File doesn't exist or is empty, try Backblaze
-    console.log('📚 Local books.json not found or empty, trying Backblaze...');
+  } catch (err) {
+    console.error('Error building book list from providers:', err.message || err);
   }
-  
-  // If local file is empty or doesn't exist, try downloading from Backblaze
-  const booksFromB2 = await downloadBooksJsonFromB2();
-  if (booksFromB2 && booksFromB2.length > 0) {
-    // Save to local file for faster access
-    try {
-      await fs.writeFile(BOOKS_FILE, JSON.stringify(booksFromB2, null, 2));
-      console.log(`✅ Synced ${booksFromB2.length} books from Backblaze to local file`);
-    } catch (err) {
-      console.warn('Could not save to local file:', err.message);
-    }
-    return booksFromB2;
-  }
-  
-  console.log('📚 No books found in local file or Backblaze, starting fresh');
-  return [];
+
+  return result;
 }
 
 async function saveBooks(books) {
-  // Save to local books.json first
-  try {
-    await fs.writeFile(BOOKS_FILE, JSON.stringify(books, null, 2));
-    console.log(`✅ Saved ${books.length} books to local books.json`);
-  } catch (error) {
-    console.error('Error saving books.json:', error);
-    throw error;
-  }
-  
-  // Also upload to Backblaze B2 for persistence (WAIT for it to complete)
-  // This is critical for deployed servers where local files are temporary
-  if (hasB2Credentials) {
-    try {
-      const uploaded = await uploadBooksJsonToB2(books);
-      if (!uploaded) {
-        console.error('❌ CRITICAL: Failed to upload books.json to Backblaze. Books will be lost on server restart!');
-        console.error('   Please check your B2 credentials: B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_ID');
-      }
-    } catch (err) {
-      console.error('❌ CRITICAL: Error uploading books.json to Backblaze:', err.message);
-      console.error('   Books are saved locally but will be lost on server restart if B2 is not working!');
-      // Don't throw - allow the request to succeed, but log the critical error
-    }
-  } else {
-    console.warn('⚠️  WARNING: Backblaze B2 not configured. Books will be lost on server restart!');
-    console.warn('   Set B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_ID in your environment variables.');
-  }
+  // No-op: books are not persisted in books.json anymore
+  console.log(`ℹ️ saveBooks called with ${Array.isArray(books) ? books.length : 0} items (no-op)`);
+  return true;
 }
 
 // Helper functions for blogs JSON file
@@ -466,6 +514,12 @@ function verifyAdminPassword(req, res, next) {
 // Get all books
 app.get('/api/books', async (req, res) => {
   try {
+    // Disable caching to avoid stale lists
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+
     const books = await getBooks();
     
     // Transform book data to ensure consistent response format
@@ -505,6 +559,12 @@ app.get('/api/books', async (req, res) => {
 // Get book by ID
 app.get('/api/books/:id', async (req, res) => {
   try {
+    // Disable caching for single book too
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+
     const books = await getBooks();
     const book = books.find(b => b.id === req.params.id);
     
