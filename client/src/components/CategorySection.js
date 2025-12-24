@@ -27,13 +27,17 @@ const CategorySection = ({ title, books, categoryRoute }) => {
             {books.slice(0, 8).map((book, index) => (
               <motion.div
                 key={book.id || index}
-                className="trending-card"
+                className="trending-card deco-card"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
                 onClick={() => navigate(`/book/${book.id}`)}
                 style={{ cursor: 'pointer' }}
               >
+                <div className="deco-corner deco-top deco-left"></div>
+                <div className="deco-corner deco-top deco-right"></div>
+                <div className="deco-corner deco-bottom deco-left"></div>
+                <div className="deco-corner deco-bottom deco-right"></div>
                 <div className="trending-cover">
                   {getCoverImageUrl(book) ? (
                     <img

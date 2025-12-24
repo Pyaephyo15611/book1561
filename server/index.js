@@ -187,6 +187,29 @@ function encodeB2Path(fileName) {
     .join('/');
 }
 
+function toCloudinaryContextValue(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\|/g, ' ');
+}
+
+function buildCloudinaryCustomContext({ title, author, description, category, readingTime, rating, isTrending }) {
+  return {
+    title: toCloudinaryContextValue(title),
+    author: toCloudinaryContextValue(author),
+    description: toCloudinaryContextValue(description),
+    category: toCloudinaryContextValue(category),
+    readingTime: toCloudinaryContextValue(readingTime),
+    rating: rating ? String(rating) : '0',
+    isTrending: isTrending ? 'true' : 'false'
+  };
+}
+
+function buildCloudinaryContextString(custom) {
+  return Object.entries(custom)
+    .map(([k, v]) => `${k}=${toCloudinaryContextValue(v)}`)
+    .join('|');
+}
+
 function getB2DownloadBaseUrl() {
   if (b2AuthData?.downloadUrl) return b2AuthData.downloadUrl;
   if (process.env.B2_BUCKET_ID) return `https://f${process.env.B2_BUCKET_ID}.backblazeb2.com`;
@@ -364,113 +387,154 @@ async function downloadBooksJsonFromB2() {
 
 // Helper functions for books - use Backblaze B2 for persistence
 async function getBooks() {
-  // Build book list dynamically from Cloudinary (covers) and Backblaze B2 (PDFs)
-  const result = [];
+  // Prefer Backblaze B2 persistence (works on ephemeral hosts like Render)
+  if (hasB2Credentials) {
+    const b2Books = await downloadBooksJsonFromB2();
+    if (Array.isArray(b2Books)) {
+      console.log(`✅ Loaded ${b2Books.length} books from Backblaze data/books.json`);
+      return b2Books;
+    }
+  }
 
-  if (!hasCloudinaryCredentials) {
-    console.warn('⚠️ Cloudinary not configured; cannot list books without books.json. Returning empty list.');
+  // Next try local books.json for complete metadata
+  try {
+    const data = await fs.readFile(BOOKS_FILE, 'utf8');
+    const books = JSON.parse(data);
+    console.log(`✅ Read ${books.length} books from local books.json`);
+    return books;
+  } catch (error) {
+    console.warn('⚠️ books.json not found or corrupted, falling back to Cloudinary:', error.message);
+
+    // Fallback: Build book list dynamically from Cloudinary (covers) and Backblaze B2 (PDFs)
+    const result = [];
+
+    if (!hasCloudinaryCredentials) {
+      console.warn('⚠️ Cloudinary not configured; cannot list books without books.json. Returning empty list.');
+      return result;
+    }
+
+    try {
+      // Determine covers folder used when uploading (see POST /api/admin/books)
+      const coversFolder = (process.env.CLOUDINARY_FOLDER ? `${process.env.CLOUDINARY_FOLDER}/book-covers` : 'bookstore/book-covers');
+
+      // List cover assets; each cover is uploaded with public_id like `${coversFolder}/cover-${bookId}`
+      const resourcesResp = await cloudinary.api.resources({
+        type: 'upload',
+        prefix: `${coversFolder}/cover-`,
+        max_results: 500,
+        context: true
+      });
+
+      const covers = resourcesResp?.resources || [];
+
+      // For each cover, derive bookId and then discover PDFs on B2 by prefix
+      for (const r of covers) {
+        const publicId = r.public_id; // e.g., bookstore/book-covers/cover-<bookId>
+        const lastSegment = publicId.split('/').pop();
+        const bookId = lastSegment.startsWith('cover-') ? lastSegment.substring('cover-'.length) : lastSegment;
+
+        // Read metadata from Cloudinary context if available
+        const ctx = (r.context && r.context.custom) ? r.context.custom : {};
+        const title = ctx.title || '';
+        const author = ctx.author || '';
+        const description = ctx.description || '';
+        const category = ctx.category || 'General';
+        const readingTime = ctx.readingTime || 'Flexible';
+        const rating = ctx.rating ? Number(ctx.rating) : 0;
+        const isTrending = ctx.isTrending === 'true' || ctx.isTrending === true;
+
+        // Discover PDFs on Backblaze
+        let b2FileName = null;
+        let pdfParts = null;
+        if (hasB2Credentials) {
+          try {
+            await ensureB2Authorized();
+            const prefix = `books/${bookId}/`;
+            let startFileName = prefix;
+            let done = false;
+            const files = [];
+            while (!done) {
+              const resp = await b2.listFileNames({
+                bucketId: process.env.B2_BUCKET_ID,
+                startFileName,
+                maxFileCount: 1000
+              });
+              const batch = resp?.data?.files || [];
+              for (const f of batch) {
+                if (f.fileName.startsWith(prefix)) files.push(f);
+              }
+              startFileName = resp?.data?.nextFileName || '';
+              done = !startFileName || !startFileName.startsWith(prefix);
+            }
+
+            const partFiles = files.filter(f => f.fileName.includes('/parts/') && f.fileName.toLowerCase().endsWith('.pdf'))
+                                   .sort((a, b) => a.fileName.localeCompare(b.fileName));
+            if (partFiles.length > 0) {
+              let partNumber = 1;
+              pdfParts = partFiles.map(f => ({
+                partNumber: partNumber++,
+                b2FileName: f.fileName,
+                fileName: f.fileName
+              }));
+            } else {
+              const single = files.find(f => f.fileName.toLowerCase().endsWith('.pdf'));
+              if (single) b2FileName = single.fileName;
+            }
+          } catch (e) {
+            console.warn('⚠️ Failed to list PDFs on B2 for', bookId, e.message || e);
+          }
+        }
+
+        result.push({
+          id: bookId,
+          title,
+          author,
+          description,
+          category,
+          readingTime,
+          rating,
+          isTrending,
+          createdAt: r.created_at || null,
+          updatedAt: r.created_at || null,
+          coverImage: r.secure_url,
+          cloudinaryCoverUrl: r.secure_url,
+          b2FileName,
+          pdfParts
+        });
+      }
+    } catch (err) {
+      console.error('Error building book list from providers:', err.message || err);
+    }
+
     return result;
   }
-
-  try {
-    // Determine covers folder used when uploading (see POST /api/admin/books)
-    const coversFolder = (process.env.CLOUDINARY_FOLDER ? `${process.env.CLOUDINARY_FOLDER}/book-covers` : 'bookstore/book-covers');
-
-    // List cover assets; each cover is uploaded with public_id like `${coversFolder}/cover-${bookId}`
-    const resourcesResp = await cloudinary.api.resources({
-      type: 'upload',
-      prefix: `${coversFolder}/cover-`,
-      max_results: 500
-    });
-
-    const covers = resourcesResp?.resources || [];
-
-    // For each cover, derive bookId and then discover PDFs on B2 by prefix
-    for (const r of covers) {
-      const publicId = r.public_id; // e.g., bookstore/book-covers/cover-<bookId>
-      const lastSegment = publicId.split('/').pop();
-      const bookId = lastSegment.startsWith('cover-') ? lastSegment.substring('cover-'.length) : lastSegment;
-
-      // Read metadata from Cloudinary context if available
-      const ctx = (r.context && r.context.custom) ? r.context.custom : {};
-      const title = ctx.title || '';
-      const author = ctx.author || '';
-      const description = ctx.description || '';
-      const category = ctx.category || 'General';
-      const readingTime = ctx.readingTime || 'Flexible';
-      const rating = ctx.rating ? Number(ctx.rating) : 0;
-      const isTrending = ctx.isTrending === 'true' || ctx.isTrending === true;
-
-      // Discover PDFs on Backblaze
-      let b2FileName = null;
-      let pdfParts = null;
-      if (hasB2Credentials) {
-        try {
-          await ensureB2Authorized();
-          const prefix = `books/${bookId}/`;
-          let startFileName = prefix;
-          let done = false;
-          const files = [];
-          while (!done) {
-            const resp = await b2.listFileNames({
-              bucketId: process.env.B2_BUCKET_ID,
-              startFileName,
-              maxFileCount: 1000
-            });
-            const batch = resp?.data?.files || [];
-            for (const f of batch) {
-              if (f.fileName.startsWith(prefix)) files.push(f);
-            }
-            startFileName = resp?.data?.nextFileName || '';
-            done = !startFileName || !startFileName.startsWith(prefix);
-          }
-
-          const partFiles = files.filter(f => f.fileName.includes('/parts/') && f.fileName.toLowerCase().endsWith('.pdf'))
-                                 .sort((a, b) => a.fileName.localeCompare(b.fileName));
-          if (partFiles.length > 0) {
-            let partNumber = 1;
-            pdfParts = partFiles.map(f => ({
-              partNumber: partNumber++,
-              b2FileName: f.fileName,
-              fileName: f.fileName
-            }));
-          } else {
-            const single = files.find(f => f.fileName.toLowerCase().endsWith('.pdf'));
-            if (single) b2FileName = single.fileName;
-          }
-        } catch (e) {
-          console.warn('⚠️ Failed to list PDFs on B2 for', bookId, e.message || e);
-        }
-      }
-
-      result.push({
-        id: bookId,
-        title,
-        author,
-        description,
-        category,
-        readingTime,
-        rating,
-        isTrending,
-        createdAt: r.created_at || null,
-        updatedAt: r.created_at || null,
-        coverImage: r.secure_url,
-        cloudinaryCoverUrl: r.secure_url,
-        b2FileName,
-        pdfParts
-      });
-    }
-  } catch (err) {
-    console.error('Error building book list from providers:', err.message || err);
-  }
-
-  return result;
 }
 
 async function saveBooks(books) {
-  // No-op: books are not persisted in books.json anymore
-  console.log(`ℹ️ saveBooks called with ${Array.isArray(books) ? books.length : 0} items (no-op)`);
-  return true;
+  try {
+    console.log('💾 DEBUG: saveBooks called with books count:', books.length);
+    console.log('💾 DEBUG: books.json path:', BOOKS_FILE);
+    const jsonString = JSON.stringify(books, null, 2);
+    console.log('💾 DEBUG: JSON string length:', jsonString.length);
+    
+    await fs.writeFile(BOOKS_FILE, jsonString);
+    console.log(`✅ DEBUG: Successfully saved ${books.length} books to books.json`);
+
+    if (hasB2Credentials) {
+      const uploaded = await uploadBooksJsonToB2(books);
+      console.log(`📤 DEBUG: Upload books.json to Backblaze result: ${uploaded}`);
+    }
+    
+    // Verify the write
+    const verifyData = await fs.readFile(BOOKS_FILE, 'utf8');
+    const verifyBooks = JSON.parse(verifyData);
+    console.log('💾 DEBUG: Verification - books in file after save:', verifyBooks.length);
+    
+    return true;
+  } catch (error) {
+    console.error('❌ DEBUG: Error saving books:', error);
+    throw error;
+  }
 }
 
 // Helper functions for blogs JSON file
@@ -670,14 +734,25 @@ app.post(
   ]),
   async (req, res) => {
     try {
+      console.log('🔍 DEBUG: Admin upload request received');
+      console.log('🔍 DEBUG: Request body:', req.body);
+      console.log('🔍 DEBUG: Request files:', req.files ? Object.keys(req.files) : 'No files');
+      
       const { title, author, description, category, readingTime, rating, isTrending, hasParts, partsCount } = req.body;
 
+      console.log('🔍 DEBUG: Extracted fields:', { title, author, description, category, readingTime, rating, isTrending, hasParts, partsCount });
+
       if (!title || !author) {
+        console.log('❌ DEBUG: Missing title or author');
         return res.status(400).json({ error: 'Title and author are required' });
       }
 
+      console.log('📚 DEBUG: Getting current books...');
       const books = await getBooks();
+      console.log(`📚 DEBUG: Current books count: ${books.length}`);
+      
       const bookId = `book_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`🆔 DEBUG: Generated bookId: ${bookId}`);
 
       let pdfParts = [];
       let b2PdfFileName = null;
@@ -738,6 +813,15 @@ app.post(
       if (req.files['coverImage']?.[0] && hasCloudinaryCredentials) {
         const imageFile = req.files['coverImage'][0];
         // Use upload_stream instead of direct upload for buffers to avoid signature timestamp issues
+        const customContext = buildCloudinaryCustomContext({
+          title: title.trim(),
+          author: author.trim(),
+          description: description?.trim() || '',
+          category: category?.trim() || 'General',
+          readingTime: readingTime?.trim() || 'Flexible',
+          rating,
+          isTrending: isTrending === 'true'
+        });
         const cloudinaryResult = await new Promise((resolve, reject) => {
           const uploadStream = cloudinary.uploader.upload_stream(
             {
@@ -750,6 +834,9 @@ app.post(
               width: 600,
               crop: 'limit',
               timestamp: Math.floor((Date.now() + timeOffset) / 1000),
+              context: {
+                custom: customContext
+              },
               transformation: [
                 { width: 600, height: 900, crop: 'fill' },
                 { quality: 'auto:good' }
@@ -805,8 +892,14 @@ app.post(
         updatedAt: new Date().toISOString()
       };
 
+      console.log('📖 DEBUG: Created bookData:', JSON.stringify(bookData, null, 2));
+
       books.push(bookData);
+      console.log(`📚 DEBUG: Books after push: ${books.length} items`);
+      
+      console.log('💾 DEBUG: Attempting to save books...');
       await saveBooks(books);
+      console.log('✅ DEBUG: Save completed');
       
       res.status(201).json(bookData);
     } catch (error) {
@@ -866,6 +959,15 @@ app.put(
         let cloudinaryCoverUrl = null;
         // Upload new cover to Cloudinary
         try {
+          const customContext = buildCloudinaryCustomContext({
+            title: title !== undefined ? title.trim() : book.title,
+            author: author !== undefined ? author.trim() : book.author,
+            description: description !== undefined ? description.trim() : book.description,
+            category: category !== undefined ? (category.trim() || 'General') : book.category,
+            readingTime: readingTime !== undefined ? readingTime.trim() : book.readingTime,
+            rating: rating !== undefined ? rating : book.rating,
+            isTrending: isTrending !== undefined ? (isTrending === 'true' || isTrending === true) : book.isTrending
+          });
           // Use stream upload to avoid timestamp issues
           const result = await new Promise((resolve, reject) => {
             const uploadStream = cloudinary.uploader.upload_stream(
@@ -873,6 +975,7 @@ app.put(
                 resource_type: 'image',
                 folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/covers',
                 public_id: sanitizedImageName.replace(/\.[^.]+$/, ''),
+                context: { custom: customContext },
                 timestamp: Math.floor((Date.now() + timeOffset) / 1000) // Use synced time
               },
               (error, result) => {
@@ -908,12 +1011,96 @@ app.put(
       if (rating !== undefined) book.rating = rating ? Number(rating) : null;
       if (isTrending !== undefined) book.isTrending = isTrending === 'true' || isTrending === true;
 
+      // Persist updated metadata into Cloudinary context for the main cover asset
+      if (hasCloudinaryCredentials) {
+        try {
+          const coversFolder = (process.env.CLOUDINARY_FOLDER ? `${process.env.CLOUDINARY_FOLDER}/book-covers` : 'bookstore/book-covers');
+          const coverPublicId = `${coversFolder}/cover-${req.params.id}`;
+          const customContext = buildCloudinaryCustomContext({
+            title: book.title,
+            author: book.author,
+            description: book.description,
+            category: book.category,
+            readingTime: book.readingTime,
+            rating: book.rating,
+            isTrending: book.isTrending
+          });
+          await cloudinary.uploader.explicit(coverPublicId, {
+            type: 'upload',
+            resource_type: 'image',
+            context: buildCloudinaryContextString(customContext)
+          });
+        } catch (e) {
+          console.warn('⚠️  Failed to update Cloudinary context for book cover:', e.message || e);
+        }
+      }
+
       books[index] = book;
       await saveBooks(books);
       res.json(book);
     } catch (error) {
       console.error('Error updating book:', error);
       res.status(500).json({ error: error.message || 'Failed to update book' });
+    }
+  }
+);
+
+// Backfill / update metadata without reuploading files
+app.patch(
+  '/api/admin/books/:id/metadata',
+  verifyAdminPassword,
+  async (req, res) => {
+    try {
+      const { title, author, description, category, readingTime, rating, isTrending } = req.body || {};
+
+      const books = await getBooks();
+      const index = books.findIndex((b) => b.id === req.params.id);
+      if (index === -1) {
+        return res.status(404).json({ error: 'Book not found' });
+      }
+
+      const book = books[index];
+
+      if (title !== undefined) book.title = String(title).trim();
+      if (author !== undefined) book.author = String(author).trim();
+      if (description !== undefined) book.description = String(description).trim();
+      if (category !== undefined) book.category = String(category).trim() || 'General';
+      if (readingTime !== undefined) book.readingTime = String(readingTime).trim();
+      if (rating !== undefined) book.rating = rating ? Number(rating) : 0;
+      if (isTrending !== undefined) book.isTrending = isTrending === 'true' || isTrending === true;
+
+      book.updatedAt = new Date().toISOString();
+
+      if (hasCloudinaryCredentials) {
+        try {
+          const coversFolder = (process.env.CLOUDINARY_FOLDER ? `${process.env.CLOUDINARY_FOLDER}/book-covers` : 'bookstore/book-covers');
+          const coverPublicId = `${coversFolder}/cover-${req.params.id}`;
+          const customContext = buildCloudinaryCustomContext({
+            title: book.title,
+            author: book.author,
+            description: book.description,
+            category: book.category,
+            readingTime: book.readingTime,
+            rating: book.rating,
+            isTrending: book.isTrending
+          });
+          await cloudinary.uploader.explicit(coverPublicId, {
+            type: 'upload',
+            resource_type: 'image',
+            context: buildCloudinaryContextString(customContext)
+          });
+        } catch (e) {
+          console.warn('⚠️  Failed to update Cloudinary context for book cover:', e.message || e);
+        }
+      }
+
+      books[index] = book;
+      await saveBooks(books);
+
+      res.json(book);
+    } catch (error) {
+      console.error('Error updating book metadata:', error);
+      res.status(500).json({ error: error.message || 'Failed to update book metadata' });
     }
   }
 );

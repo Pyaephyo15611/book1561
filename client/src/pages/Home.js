@@ -5,7 +5,11 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import axios from 'axios';
 import {
-  BookOpen
+  BookOpen,
+  Facebook,
+  Instagram,
+  Twitter,
+  Youtube
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
@@ -13,7 +17,7 @@ import CategorySection from '../components/CategorySection';
 import BlogSection from '../components/BlogSection';
 import { API_URL } from '../utils/apiConfig';
 import './Home.css';
-import logo from '../assets/logo3.png';
+import bannerLogo from '../assets/logo.png';
 
 console.log('API_URL configured as:', API_URL);
 
@@ -230,30 +234,52 @@ const Home = () => {
 
       <div className="home-page">
         {/* Manybooks-style hero */}
-        <header className="hero">
-        <div className="hero-bg" aria-hidden="true">
-          <div className="hero-overlay"></div>
-        </div>
-        <div className="container">
-          <motion.div
-            className="hero-content"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-           <img
-    src={logo}
-    alt="BookStore Logo"
-    className="hero-logo"
-    onClick={() => navigate('/')}
-  />
-            <h1>Lots of ebooks. 100% free.</h1>
-            <p className="subtitle">
-              Welcome to your friendly neighborhood library. We have more than {displayBooks.length}+ free ebooks waiting to be discovered.
-            </p>
-          </motion.div>
-        </div>
-      </header>
+        <header className="hero banner-hero">
+          <div className="hero-bg" aria-hidden="true">
+            <div className="hero-overlay"></div>
+          </div>
+          <div className="container banner-column">
+            <div className="banner-media">
+              <img
+                src={bannerLogo}
+                alt="Logo"
+                className="banner-image"
+              />
+            </div>
+            <motion.div
+              className="banner-inner"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <h1 className="title-large">အခမဲ့ အီးဘုတ်တွေကို အလွယ်တကူ ဖတ်ရှုလိုက်ပါ</h1>
+              <p className="text-base font-normal">
+                စာအုပ်အမျိုးအစားစုံကို အွန်လိုင်းမှာ ဖတ်ရှုနိုင်သလို ဒေါင်းလုဒ်လည်း လုပ်နိုင်ပါတယ်။ မိမိနှစ်သက်ရာ စာအုပ်ကို ယနေ့ပဲ စတင်ရှာဖွေလိုက်ပါ။
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => window.scrollTo({ top: document.querySelector('.news-books')?.offsetTop - 90, behavior: 'smooth' })}
+              >
+                စာအုပ်တွေကို ကြည့်မယ်
+              </button>
+            </motion.div>
+            <div className="banner-social" aria-label="Social links">
+              <a href="#" className="banner-social-link" aria-label="Facebook">
+                <Facebook size={18} />
+              </a>
+              <a href="#" className="banner-social-link" aria-label="Instagram">
+                <Instagram size={18} />
+              </a>
+              <a href="#" className="banner-social-link" aria-label="Twitter">
+                <Twitter size={18} />
+              </a>
+              <a href="#" className="banner-social-link" aria-label="YouTube">
+                <Youtube size={18} />
+              </a>
+            </div>
+          </div>
+        </header>
 
       <main className="main-content">
         {/* Blog Section */}
@@ -262,26 +288,22 @@ const Home = () => {
         {/* Search bar and quick filters */}
         <section className="section search-section">
           <div className="container">
-            <form
-              className="navbar-search home-search"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (searchTerm.trim()) {
-                  navigate(`/search/${encodeURIComponent(searchTerm.trim())}`);
-                }
-              }}
-            >
+            <div className="input-container">
               <input
+                className="input"
+                name="text"
                 type="text"
-                placeholder="Search by title, author or keyword"
+                placeholder="Search the internet..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchTerm.trim()) {
+                    navigate(`/search/${encodeURIComponent(searchTerm.trim())}`);
+                  }
+                }}
               />
-              <button type="submit" className="navbar-search-btn">
-                Search
-              </button>
-            </form>
-                      </div>
+            </div>
+          </div>
         </section>
 
         {/* News Books Section with horizontal scroll */}
@@ -341,13 +363,17 @@ const Home = () => {
                     .map((book, index) => (
                     <motion.div
                       key={book.id}
-                      className="news-book-card"
+                      className="news-book-card deco-card"
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
                       onClick={() => navigate(`/book/${book.id}`)}
                       style={{ cursor: 'pointer' }}
                     >
+                      <div className="deco-corner deco-top deco-left"></div>
+                      <div className="deco-corner deco-top deco-right"></div>
+                      <div className="deco-corner deco-bottom deco-left"></div>
+                      <div className="deco-corner deco-bottom deco-right"></div>
                       <div className="trending-cover">
                         <img
                           src={getCoverImageUrl(book)}

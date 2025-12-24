@@ -9,6 +9,7 @@ const Admin = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   
   const [formData, setFormData] = useState({
     title: '',
@@ -149,6 +150,10 @@ const Admin = () => {
       ...prev,
       [name]: value
     }));
+    // Clear field error on change
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
 
@@ -344,28 +349,48 @@ const Admin = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    // Check if PDF or parts are provided
+  const validateFields = () => {
+    const errors = {};
+    if (!formData.title.trim()) errors.title = 'Title is required';
+    if (!formData.author.trim()) errors.author = 'Author is required';
+    if (!formData.category) errors.category = 'Category is required';
+    
     const isComic = formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic';
     const hasParts = isComic && formData.pdfParts.length > 0 && formData.pdfParts.some(p => p.file);
     const hasSinglePdf = formData.pdf;
-
+    
     if (!hasSinglePdf && !hasParts && !editingId) {
-      setError(isComic ? 'Please upload PDF parts or a single PDF file' : 'Please select a PDF file');
-      setLoading(false);
+      errors.pdf = isComic ? 'Upload PDF parts or a single PDF file' : 'PDF file is required';
+    }
+    if (isComic && hasParts && hasSinglePdf) {
+      errors.pdf = 'Use either PDF parts OR a single PDF file, not both';
+    }
+    
+    return errors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const errors = validateFields();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Please fill in all required fields');
       return;
     }
 
-    if (isComic && hasParts && hasSinglePdf) {
-      setError('Please use either PDF parts OR a single PDF file, not both');
-      setLoading(false);
-      return;
-    }
+    const isComic =
+      formData.category === 'ရုပ်ပြ' ||
+      formData.category === 'comic' ||
+      formData.category === 'graphic';
+    const hasParts =
+      isComic &&
+      formData.pdfParts.length > 0 &&
+      formData.pdfParts.some((p) => p.file);
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setFieldErrors({});
 
     try {
       const formDataToSend = new FormData();
@@ -535,10 +560,11 @@ const Admin = () => {
                 name="title"
                 value={formData.title}
                 onChange={handleInputChange}
-                className="form-input"
+                className={`form-input ${fieldErrors.title ? 'error' : ''}`}
                 required
                 placeholder="Enter book title"
               />
+              {fieldErrors.title && <small className="field-error">{fieldErrors.title}</small>}
             </div>
 
             <div className="form-group">
@@ -549,10 +575,11 @@ const Admin = () => {
                 name="author"
                 value={formData.author}
                 onChange={handleInputChange}
-                className="form-input"
+                className={`form-input ${fieldErrors.author ? 'error' : ''}`}
                 required
                 placeholder="Enter author name"
               />
+              {fieldErrors.author && <small className="field-error">{fieldErrors.author}</small>}
             </div>
 
             <div className="form-group full-width">
@@ -575,7 +602,7 @@ const Admin = () => {
                 name="category"
                 value={formData.category}
                 onChange={handleInputChange}
-                className="form-input"
+                className={`form-input ${fieldErrors.category ? 'error' : ''}`}
                 required
               >
                 <option value="">Select a category...</option>
@@ -603,6 +630,7 @@ const Admin = () => {
                   <option value="comic">Comic</option>
                 </optgroup>
               </select>
+              {fieldErrors.category && <small className="field-error">{fieldErrors.category}</small>}
               <small className="form-hint">
                 Select a category to organize your book. Books with Burmese categories will appear in their corresponding sections on the home page.
               </small>
@@ -681,7 +709,7 @@ const Admin = () => {
                   name="pdf"
                   accept=".pdf"
                   onChange={handlePdfFileChange}
-                  className="file-input"
+                  className={`file-input ${fieldErrors.pdf ? 'error' : ''}`}
                   required={!editingId && !(formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic')}
                 />
                 <label htmlFor="pdf" className="file-label">
@@ -689,6 +717,7 @@ const Admin = () => {
                   {formData.pdf ? formData.pdf.name : 'Choose PDF file (or use Parts below for comics)'}
                 </label>
               </div>
+              {fieldErrors.pdf && <small className="field-error">{fieldErrors.pdf}</small>}
               <small className="form-hint">
                 {formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic' 
                   ? 'Upload a single PDF file, OR use the Parts section below for comics/manga with multiple parts.'
