@@ -211,6 +211,7 @@ function buildCloudinaryContextString(custom) {
 }
 
 function getB2DownloadBaseUrl() {
+  if (process.env.B2_CDN_BASE_URL) return process.env.B2_CDN_BASE_URL.replace(/\/+$/, '');
   if (b2AuthData?.downloadUrl) return b2AuthData.downloadUrl;
   if (process.env.B2_BUCKET_ID) return `https://f${process.env.B2_BUCKET_ID}.backblazeb2.com`;
   return null;
@@ -1532,9 +1533,32 @@ app.get('/api/books/:id/view', async (req, res) => {
     
     // Handle PDF parts - return first part
     if (book.pdfParts && book.pdfParts.length > 0) {
+      if (process.env.B2_CDN_BASE_URL && hasB2Credentials) {
+        const partsWithUrls = await Promise.all(
+          book.pdfParts
+            .slice()
+            .sort((a, b) => a.partNumber - b.partNumber)
+            .map(async (p) => ({
+              partNumber: p.partNumber,
+              b2FileName: p.b2FileName,
+              viewUrl: await getB2CdnUrl(p.b2FileName)
+            }))
+        );
+
+        const firstPartUrl = partsWithUrls.find(p => p.partNumber === 1)?.viewUrl;
+        if (firstPartUrl) {
+          return res.json({
+            viewUrl: firstPartUrl,
+            isSplit: true,
+            totalParts: book.pdfParts.length,
+            parts: partsWithUrls
+          });
+        }
+      }
+
       const protocol = getProtocol(req);
       const proxyUrl = `${protocol}://${req.get('host')}/api/books/${req.params.id}/pdf/part/1`;
-      return res.json({ 
+      return res.json({
         viewUrl: proxyUrl,
         isSplit: true,
         totalParts: book.pdfParts.length,
@@ -1547,9 +1571,14 @@ app.get('/api/books/:id/view', async (req, res) => {
     
     const fileName = book.b2FileName || book.fileName;
     
-    // If the book is stored in Backblaze, use our proxy PDF endpoint
-    // so we can add CORS headers and avoid browser CORS errors.
     if (fileName) {
+      if (process.env.B2_CDN_BASE_URL && hasB2Credentials) {
+        const cdnUrl = await getB2CdnUrl(fileName);
+        if (cdnUrl) {
+          return res.json({ viewUrl: cdnUrl, isSplit: false });
+        }
+      }
+
       const protocol = getProtocol(req);
       const proxyUrl = `${protocol}://${req.get('host')}/api/books/${req.params.id}/pdf`;
       return res.json({ viewUrl: proxyUrl, isSplit: false });
