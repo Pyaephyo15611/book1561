@@ -109,42 +109,42 @@ const Home = () => {
     {
       title: 'ရသစာပေများ',
       keywords: ['literature', 'arts', 'ရသစာပေ', 'fiction', 'novel', 'story'],
-      route: 'ရသစာပေများ'
+      route: 'ရသစာပေ'
     },
     {
       title: 'အောင်မြင်ရေးစာပေများ',
       keywords: ['success', 'self-help', 'အောင်မြင်ရေး', 'motivation', 'business', 'achievement'],
-      route: 'အောင်မြင်ရေးစာပေများ'
+      route: 'အောင်မြင်ရေး'
     },
     {
       title: 'ရုပ်ပြစာအုပ်များ',
       keywords: ['comic', 'ရုပ်ပြ', 'graphic', 'manga', 'cartoon'],
-      route: 'ရုပ်ပြစာအုပ်များ'
+      route: 'ရုပ်ပြ'
     },
     {
       title: 'ဝတ္ထုတိုများ',
       keywords: ['short story', 'ဝတ္ထုတို', 'short', 'story collection'],
-      route: 'ဝတ္ထုတိုများ'
+      route: 'ဝတ္ထုတို'
     },
     {
       title: 'သုတစာပေများ',
       keywords: ['non-fiction', 'knowledge', 'သုတ', 'education', 'reference', 'science', 'history'],
-      route: 'သုတစာပေများ'
+      route: 'သုတ'
     },
     {
       title: 'ကဗျာစာအုပ်များ',
       keywords: ['poetry', 'poem', 'ကဗျာ', 'verse'],
-      route: 'ကဗျာစာအုပ်များ'
+      route: 'ကဗျာ'
     },
     {
       title: 'ဘာသာပြန်စာအုပ်များ',
       keywords: ['translated', 'ဘာသာပြန်', 'translation'],
-      route: 'ဘာသာပြန်စာအုပ်များ'
+      route: 'ဘာသာပြန်'
     },
     {
       title: 'ဘာသာရေးစာအုပ်များ',
       keywords: ['religious', 'religion', 'ဘာသာရေး', 'spiritual', 'faith', 'buddhism', 'christian'],
-      route: 'ဘာသာရေးစာအုပ်များ'
+      route: 'ဘာသာရေး'
     }
   ];
 
@@ -396,12 +396,12 @@ const Home = () => {
             <div className="footer-section">
               <h3>စာအုပ်အမျိုးအစားများ</h3>
               <ul className="footer-links">
-                <li><button className="footer-link" onClick={() => navigate('/category/ရသစာပေများ')}>ရသစာပေများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/အောင်မြင်ရေးစာပေများ')}>အောင်မြင်ရေးစာပေများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ရုပ်ပြစာအုပ်များ')}>ရုပ်ပြစာအုပ်များ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ဝတ္ထုတိုများ')}>ဝတ္ထုတိုများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/သုတစာပေများ')}>သုတစာပေများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ကဗျာစာအုပ်များ')}>ကဗျာစာအုပ်များ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ရသစာပေ')}>ရသစာပေများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/အောင်မြင်ရေး')}>အောင်မြင်ရေးစာပေများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ရုပ်ပြ')}>ရုပ်ပြစာအုပ်များ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ဝတ္ထုတို')}>ဝတ္ထုတိုများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/သုတ')}>သုတစာပေများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ကဗျာ')}>ကဗျာစာအုပ်များ</button></li>
               </ul>
             </div>
             

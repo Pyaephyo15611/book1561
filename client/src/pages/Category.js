@@ -30,17 +30,30 @@ const Category = () => {
     fetchBooks();
   }, []);
 
-  const categoryName = decodeURIComponent(name || '').toLowerCase();
-  console.log('Category page debug:', { categoryName, totalBooks: books.length });
+  const normalizeCategory = (value) => {
+    return decodeURIComponent(value || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/(စာပေများ|စာအုပ်များ|များ)$/u, '')
+      .toLowerCase();
+  };
+
+  const categoryMatches = (bookCategoryRaw, routeCategoryRaw) => {
+    const bookCategory = normalizeCategory(bookCategoryRaw);
+    const routeCategory = normalizeCategory(routeCategoryRaw);
+
+    if (!bookCategory || !routeCategory) return false;
+
+    return (
+      bookCategory === routeCategory ||
+      bookCategory.includes(routeCategory) ||
+      routeCategory.includes(bookCategory)
+    );
+  };
+
+  const categoryName = normalizeCategory(name);
   const filtered = books
-    .filter((b) => {
-      const bookCategory = (b.category || '').toLowerCase();
-      const matches = bookCategory === categoryName;
-      if (!matches && bookCategory && categoryName) {
-        console.log('Category mismatch:', { bookCategory, categoryName, bookTitle: b.title });
-      }
-      return matches;
-    })
+    .filter((b) => categoryMatches(b.category, name))
     .filter((b) => {
       if (!query.trim()) return true;
       const q = query.toLowerCase();
@@ -61,7 +74,6 @@ const Category = () => {
           return 0;
       }
     });
-  console.log('Category filtered results:', { filteredCount: filtered.length, sampleBooks: filtered.slice(0, 3).map(b => ({ title: b.title, category: b.category })) });
 
   return (
     <div className="home-page category-page">
