@@ -265,18 +265,18 @@ const Home = () => {
               </button>
             </motion.div>
             <div className="banner-social" aria-label="Social links">
-              <a href="#" className="banner-social-link" aria-label="Facebook">
+              <button type="button" className="banner-social-link" aria-label="Facebook">
                 <Facebook size={18} />
-              </a>
-              <a href="#" className="banner-social-link" aria-label="Instagram">
+              </button>
+              <button type="button" className="banner-social-link" aria-label="Instagram">
                 <Instagram size={18} />
-              </a>
-              <a href="#" className="banner-social-link" aria-label="Twitter">
+              </button>
+              <button type="button" className="banner-social-link" aria-label="Twitter">
                 <Twitter size={18} />
-              </a>
-              <a href="#" className="banner-social-link" aria-label="YouTube">
+              </button>
+              <button type="button" className="banner-social-link" aria-label="YouTube">
                 <Youtube size={18} />
-              </a>
+              </button>
             </div>
           </div>
         </header>
