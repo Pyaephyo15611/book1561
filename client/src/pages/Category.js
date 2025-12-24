@@ -51,7 +51,6 @@ const Category = () => {
     );
   };
 
-  const categoryName = normalizeCategory(name);
   const filtered = books
     .filter((b) => categoryMatches(b.category, name))
     .filter((b) => {
