@@ -37,18 +37,18 @@ const AuthorDetail = () => {
   }, [authorName]);
 
   return (
-    <div className="home-page">
+    <div className="home-page author-page">
       <main className="main-content">
         <section className="section">
           <div className="container">
             <div className="section-header category-header">
-              <button className="btn btn-outline" onClick={() => navigate('/authors')}>
-                <ArrowLeft size={18} /> Back to Authors
+              <button className="btn btn-outline" onClick={() => navigate(-1)}>
+                <ArrowLeft size={18} /> Back
               </button>
-              <div>
+              <div className="author-header-content">
                 <span className="section-eyebrow">Author</span>
                 <h2 className="section-title">{authorName}</h2>
-                <p style={{ marginTop: '0.5rem', color: '#6b7280' }}>
+                <p className="author-subtitle">
                   {books.length} {books.length === 1 ? 'book' : 'books'} by this author
                 </p>
               </div>

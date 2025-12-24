@@ -30,8 +30,17 @@ const Category = () => {
     fetchBooks();
   }, []);
 
+  const categoryName = decodeURIComponent(name || '').toLowerCase();
+  console.log('Category page debug:', { categoryName, totalBooks: books.length });
   const filtered = books
-    .filter((b) => (b.category || '').toLowerCase() === decodeURIComponent(name || '').toLowerCase())
+    .filter((b) => {
+      const bookCategory = (b.category || '').toLowerCase();
+      const matches = bookCategory === categoryName;
+      if (!matches && bookCategory && categoryName) {
+        console.log('Category mismatch:', { bookCategory, categoryName, bookTitle: b.title });
+      }
+      return matches;
+    })
     .filter((b) => {
       if (!query.trim()) return true;
       const q = query.toLowerCase();
@@ -52,9 +61,10 @@ const Category = () => {
           return 0;
       }
     });
+  console.log('Category filtered results:', { filteredCount: filtered.length, sampleBooks: filtered.slice(0, 3).map(b => ({ title: b.title, category: b.category })) });
 
   return (
-    <div className="home-page">
+    <div className="home-page category-page">
       <main className="main-content">
         <section className="section">
           <div className="container">

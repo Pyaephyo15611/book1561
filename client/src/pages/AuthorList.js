@@ -47,13 +47,13 @@ const AuthorList = () => {
   }, []);
 
   return (
-    <div className="home-page">
+    <div className="home-page author-page">
       <main className="main-content">
         <section className="section">
           <div className="container">
             <div className="section-header category-header">
-              <button className="btn btn-outline" onClick={() => navigate(-1)}>
-                <User size={18} /> Back
+              <button className="btn btn-outline" onClick={() => navigate('/')}>
+                <User size={18} /> Back to Home
               </button>
               <div>
                 <span className="section-eyebrow">Authors</span>

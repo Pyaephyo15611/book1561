@@ -14,7 +14,6 @@ import {
 import { motion } from 'framer-motion';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import CategorySection from '../components/CategorySection';
-import BlogSection from '../components/BlogSection';
 import { API_URL } from '../utils/apiConfig';
 import './Home.css';
 import bannerLogo from '../assets/logo.png';
@@ -25,18 +24,15 @@ const Home = () => {
   const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
-  const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const newsBooksScrollRef = useRef(null);
 
   useEffect(() => {
     fetchBooks();
-    fetchBlogs();
 
     const handleFocus = () => {
       fetchBooks();
-      fetchBlogs();
     };
 
     window.addEventListener('focus', handleFocus);
@@ -97,37 +93,6 @@ const Home = () => {
       setFilteredBooks([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchBlogs = async () => {
-    try {
-      // Try API first
-      try {
-        const response = await axios.get(`${API_URL}/api/blogs`);
-        console.log('Blogs fetched from API:', response.data?.length || 0);
-        setBlogs(response.data || []);
-      } catch (apiError) {
-        console.log('API not available, trying Firestore directly', apiError.message);
-        try {
-          const blogsSnapshot = await getDocs(collection(db, 'blogs'));
-          const blogsData = [];
-          blogsSnapshot.forEach((doc) => {
-            blogsData.push({
-              id: doc.id,
-              ...doc.data()
-            });
-          });
-          console.log('Blogs fetched from Firestore:', blogsData.length);
-          setBlogs(blogsData);
-        } catch (firestoreError) {
-          console.error('Firestore error:', firestoreError);
-          setBlogs([]);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching blogs:', error);
-      setBlogs([]);
     }
   };
 
@@ -282,9 +247,6 @@ const Home = () => {
         </header>
 
       <main className="main-content">
-        {/* Blog Section */}
-        <BlogSection blogs={blogs} />
-
         {/* Search bar and quick filters */}
         <section className="section search-section">
           <div className="container">
@@ -293,7 +255,7 @@ const Home = () => {
                 className="input"
                 name="text"
                 type="text"
-                placeholder="Search the internet..."
+                placeholder="Search for books..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => {

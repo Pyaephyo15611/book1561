@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, BookOpen, Lock, FileText } from 'lucide-react';
+import { Upload, BookOpen, Lock } from 'lucide-react';
 import { API_URL } from '../utils/apiConfig';
 import './Admin.css';
 
@@ -24,85 +24,9 @@ const Admin = () => {
     isTrending: false
   });
   const [books, setBooks] = useState([]);
-  const [blogs, setBlogs] = useState([]);
   const [editingId, setEditingId] = useState(null);
-  const [editingBlogId, setEditingBlogId] = useState(null);
   const [listLoading, setListLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('books');
-  
-  const [blogFormData, setBlogFormData] = useState({
-    title: '',
-    excerpt: '',
-    description: '',
-    category: 'GENERAL',
-    image: null,
-    date: new Date().toISOString().split('T')[0]
-  });
-
-  // SEO Title Analyzer
-  const analyzeTitle = (title) => {
-    if (!title) return { score: 0, feedback: [] };
-    
-    const feedback = [];
-    let score = 0;
-    const length = title.length;
-    
-    // Length check (50-60 chars optimal for search results)
-    if (length >= 50 && length <= 60) {
-      score += 30;
-      feedback.push({ type: 'success', text: `✓ Perfect length (${length} chars) - Will display fully in search results` });
-    } else if (length >= 40 && length < 50) {
-      score += 20;
-      feedback.push({ type: 'warning', text: `⚠ Good length (${length} chars) but 50-60 is optimal` });
-    } else if (length > 60 && length <= 70) {
-      score += 15;
-      feedback.push({ type: 'warning', text: `⚠ Title may be truncated in search (${length} chars, max 60 recommended)` });
-    } else if (length > 70) {
-      feedback.push({ type: 'error', text: `✗ Too long (${length} chars) - Will be cut off in search results` });
-    } else {
-      feedback.push({ type: 'error', text: `✗ Too short (${length} chars) - Aim for 50-60 characters` });
-    }
-    
-    // Keyword check
-    const words = title.toLowerCase().split(/\s+/);
-    const uniqueWords = new Set(words);
-    if (uniqueWords.size >= 3) {
-      score += 20;
-      feedback.push({ type: 'success', text: '✓ Contains multiple keywords' });
-    } else {
-      feedback.push({ type: 'warning', text: '⚠ Consider adding more relevant keywords' });
-    }
-    
-    // Power words check
-    const powerWords = ['best', 'top', 'ultimate', 'complete', 'guide', 'how', 'why', 'what', 'new', 'latest', 'free', 'tips', 'secrets', 'proven'];
-    const hasPowerWord = powerWords.some(word => title.toLowerCase().includes(word));
-    if (hasPowerWord) {
-      score += 15;
-      feedback.push({ type: 'success', text: '✓ Contains engaging power words' });
-    } else {
-      feedback.push({ type: 'info', text: '💡 Consider adding power words (best, guide, tips, etc.)' });
-    }
-    
-    // Question format
-    if (title.includes('?') || title.includes('How') || title.includes('Why') || title.includes('What')) {
-      score += 10;
-      feedback.push({ type: 'success', text: '✓ Question format increases click-through rate' });
-    }
-    
-    // Numbers
-    if (/\d/.test(title)) {
-      score += 10;
-      feedback.push({ type: 'success', text: '✓ Numbers in titles attract more clicks' });
-    }
-    
-    // Clarity
-    if (title.length > 20 && !title.includes('...')) {
-      score += 15;
-      feedback.push({ type: 'success', text: '✓ Clear and descriptive title' });
-    }
-    
-    return { score: Math.min(score, 100), feedback };
-  };
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -117,7 +41,6 @@ const Admin = () => {
   React.useEffect(() => {
     if (isAuthenticated) {
       fetchBooks();
-      fetchBlogs();
     }
   }, [isAuthenticated]);
 
@@ -131,16 +54,6 @@ const Admin = () => {
       console.error('Error fetching books:', err);
     } finally {
       setListLoading(false);
-    }
-  };
-
-  const fetchBlogs = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/blogs`);
-      const data = await response.json();
-      setBlogs(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error fetching blogs:', err);
     }
   };
 
@@ -226,117 +139,6 @@ const Admin = () => {
     } catch (err) {
       console.error('Trending toggle error:', err);
       setError(err.message || 'Failed to update trending status');
-    }
-  };
-
-  const handleBlogInputChange = (e) => {
-    const { name, value } = e.target;
-    setBlogFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleBlogImageChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setBlogFormData(prev => ({
-        ...prev,
-        image: e.target.files[0]
-      }));
-    }
-  };
-
-  const handleBlogEdit = (blog) => {
-    setEditingBlogId(blog.id);
-    setBlogFormData({
-      title: blog.title || '',
-      excerpt: blog.excerpt || blog.description || '',
-      description: blog.description || '',
-      category: blog.category || 'GENERAL',
-      image: null,
-      date: blog.date || blog.createdAt ? new Date(blog.date || blog.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleBlogDelete = async (id) => {
-    if (!window.confirm('Delete this blog post?')) return;
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}/api/admin/blogs/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'x-admin-password': adminPassword
-        }
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Delete failed');
-      }
-      setSuccess('Blog deleted');
-      fetchBlogs();
-    } catch (err) {
-      console.error('Delete error:', err);
-      setError(err.message || 'Delete failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBlogSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    if (!blogFormData.title) {
-      setError('Please enter a title');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const formDataToSend = new FormData();
-      if (blogFormData.image) formDataToSend.append('image', blogFormData.image);
-      formDataToSend.append('title', blogFormData.title);
-      formDataToSend.append('excerpt', blogFormData.excerpt);
-      formDataToSend.append('description', blogFormData.description);
-      formDataToSend.append('category', blogFormData.category);
-      formDataToSend.append('date', blogFormData.date);
-
-      const url = editingBlogId ? `${API_URL}/api/admin/blogs/${editingBlogId}` : `${API_URL}/api/admin/blogs`;
-      const method = editingBlogId ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'x-admin-password': adminPassword
-        },
-        body: formDataToSend
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Save failed');
-      }
-
-      setSuccess(editingBlogId ? 'Blog updated successfully!' : 'Blog created successfully!');
-      setBlogFormData({
-        title: '',
-        excerpt: '',
-        description: '',
-        category: 'GENERAL',
-        image: null,
-        date: new Date().toISOString().split('T')[0]
-      });
-      setEditingBlogId(null);
-      fetchBlogs();
-    } catch (err) {
-      console.error('Save error:', err);
-      setError(err.message || 'Save failed. Check server logs or Backblaze configuration.');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -500,14 +302,6 @@ const Admin = () => {
           >
             <BookOpen size={20} />
             Books
-          </button>
-          <button
-            type="button"
-            className={`admin-tab ${activeTab === 'blogs' ? 'active' : ''}`}
-            onClick={() => setActiveTab('blogs')}
-          >
-            <FileText size={20} />
-            Blogs
           </button>
         </div>
 
