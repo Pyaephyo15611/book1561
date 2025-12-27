@@ -21,7 +21,8 @@ const B2Reader = () => {
   const [bookTitle, setBookTitle] = useState('Loading...');
   const [pdfUrl, setPdfUrl] = useState('');
   const [pageInput, setPageInput] = useState('');
-  const pageRefs = useRef([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const scrollerRef = useRef(null);
 
   // Fetch book details for title
   useEffect(() => {
@@ -57,6 +58,10 @@ const B2Reader = () => {
 
   function onDocumentLoadSuccess({ numPages }) {
     setNumPages(numPages);
+    setCurrentPage((p) => {
+      const next = Math.min(Math.max(p, 1), numPages);
+      return next;
+    });
     setLoading(false);
   }
 
@@ -71,11 +76,12 @@ const B2Reader = () => {
     const raw = parseInt(pageInput, 10);
     if (isNaN(raw)) return;
     const target = Math.min(Math.max(raw, 1), numPages);
-    const el = pageRefs.current[target - 1];
-    if (el && typeof el.scrollIntoView === 'function') {
-      el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    }
+    setCurrentPage(target);
   }
+
+  const canPrev = currentPage > 1;
+  const canNext = numPages ? currentPage < numPages : false;
+  const pageWidth = scrollerRef.current ? Math.min(scrollerRef.current.clientWidth - 24, 1200) : undefined;
 
   return (
     <div className="b2reader-root">
@@ -107,7 +113,7 @@ const B2Reader = () => {
       </div>
 
       {/* Horizontal scroller */}
-      <div className="b2reader-scroller">
+      <div className="b2reader-scroller" ref={scrollerRef}>
         {error ? (
           <div className="error-message" style={{ color: '#fff', textAlign: 'center' }}>
             <h3>Error loading PDF</h3>
@@ -131,22 +137,36 @@ const B2Reader = () => {
             }
             className="b2reader-document"
           >
-            {Array.from(new Array(numPages || 0), (el, index) => (
-              <div
-                key={`page_${index + 1}`}
-                className="b2reader-page"
-                ref={(el) => (pageRefs.current[index] = el)}
-              >
-                <Page
-                  pageNumber={index + 1}
-                  scale={scale}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                  loading="Loading page..."
-                />
-                <div className="page-label">{index + 1}/{numPages || '--'}</div>
+            <div className="b2reader-page">
+              <Page
+                pageNumber={currentPage}
+                scale={scale}
+                width={pageWidth}
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+                loading="Loading page..."
+              />
+              <div className="page-label">{currentPage}/{numPages || '--'}</div>
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '12px' }}>
+                <button
+                  className="jump-btn"
+                  onClick={() => canPrev && setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={!canPrev}
+                  title="Previous page"
+                >
+                  Prev
+                </button>
+                <button
+                  className="jump-btn"
+                  onClick={() => canNext && setCurrentPage((p) => Math.min((numPages || p + 1), p + 1))}
+                  disabled={!canNext}
+                  title="Next page"
+                >
+                  Next
+                </button>
               </div>
-            ))}
+            </div>
           </Document>
         )}
       </div>

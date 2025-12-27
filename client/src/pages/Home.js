@@ -26,86 +26,7 @@ const Home = () => {
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const newsBooksScrollRef = useRef(null);
-
-  useEffect(() => {
-    fetchBooks();
-
-    const handleFocus = () => {
-      fetchBooks();
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, []);
-
-  useEffect(() => {
-    if (!searchTerm) {
-      setFilteredBooks(books);
-      return;
-    }
-
-    const term = searchTerm.toLowerCase();
-    const filtered = books.filter((book) =>
-      book.title?.toLowerCase().includes(term) ||
-      book.author?.toLowerCase().includes(term) ||
-      book.description?.toLowerCase().includes(term) ||
-      book.category?.toLowerCase().includes(term)
-    );
-    setFilteredBooks(filtered);
-  }, [searchTerm, books]);
-
-  const fetchBooks = async () => {
-    try {
-      let booksData = [];
-
-      // Try API first
-      try {
-        const response = await axios.get(`${API_URL}/api/books`);
-        booksData = response.data;
-      } catch (apiError) {
-        console.log('API not available, trying Firestore directly');
-        const booksSnapshot = await getDocs(collection(db, 'books'));
-        booksSnapshot.forEach((doc) => {
-          booksData.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
-      }
-
-      if (booksData.length === 0) {
-        console.warn('No books found');
-      }
-
-      const enhancedBooks = booksData.map((book) => ({
-        ...book,
-        rating: book.rating || (Math.random() * 2 + 3).toFixed(1),
-        pages: book.pages || book.pageCount || Math.floor(Math.random() * 200) + 150,
-        readingTime: book.readingTime || `${Math.floor((book.pages || 200) / 2)} min read`
-      }));
-
-      setBooks(enhancedBooks);
-      setFilteredBooks(enhancedBooks);
-    } catch (error) {
-      console.error('Error fetching books:', error);
-      setBooks([]);
-      setFilteredBooks([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const displayBooks = filteredBooks.length > 0 ? filteredBooks : books;
-
-  // Category mapping function to match books to categories
-  const matchBookToCategory = (book, categoryKeywords) => {
-    const bookCategory = (book.category || '').toLowerCase();
-    return categoryKeywords.some(keyword => bookCategory.includes(keyword.toLowerCase()));
-  };
-
-  // Category definitions with keywords
-  const categorySections = [
+  const defaultCategorySections = [
     {
       title: 'ရသစာပေများ',
       keywords: ['literature', 'arts', 'ရသစာပေ', 'fiction', 'novel', 'story'],
@@ -147,6 +68,134 @@ const Home = () => {
       route: 'ဘာသာရေး'
     }
   ];
+  const [categorySections, setCategorySections] = useState(defaultCategorySections);
+  const newsBooksScrollRef = useRef(null);
+  const lastFetchAtRef = useRef(0);
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('books_cache_v1');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setBooks(parsed);
+          setFilteredBooks(parsed);
+          setLoading(false);
+        }
+      }
+    } catch (e) {
+      // ignore cache parse errors
+    }
+
+    fetchBooks();
+
+    const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastFetchAtRef.current < 10000) {
+        return;
+      }
+      fetchBooks();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
+  useEffect(() => {
+    const fetchSections = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/sections`);
+        const data = response.data;
+        if (Array.isArray(data) && data.length > 0) {
+          const normalized = data
+            .filter((s) => s && s.title && s.route)
+            .map((s) => ({
+              title: s.title,
+              route: s.route,
+              keywords: Array.isArray(s.keywords) ? s.keywords : []
+            }));
+          if (normalized.length > 0) {
+            setCategorySections(normalized);
+          }
+        }
+      } catch (e) {
+        setCategorySections(defaultCategorySections);
+      }
+    };
+    fetchSections();
+  }, [API_URL]);
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setFilteredBooks(books);
+      return;
+    }
+
+    const term = searchTerm.toLowerCase();
+    const filtered = books.filter((book) =>
+      book.title?.toLowerCase().includes(term) ||
+      book.author?.toLowerCase().includes(term) ||
+      book.description?.toLowerCase().includes(term) ||
+      book.category?.toLowerCase().includes(term)
+    );
+    setFilteredBooks(filtered);
+  }, [searchTerm, books]);
+
+  const fetchBooks = async () => {
+    try {
+      lastFetchAtRef.current = Date.now();
+      let booksData = [];
+
+      // Try API first
+      try {
+        const response = await axios.get(`${API_URL}/api/books`);
+        booksData = response.data;
+      } catch (apiError) {
+        console.log('API not available, trying Firestore directly');
+        const booksSnapshot = await getDocs(collection(db, 'books'));
+        booksSnapshot.forEach((doc) => {
+          booksData.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+      }
+
+      if (booksData.length === 0) {
+        console.warn('No books found');
+      }
+
+      const enhancedBooks = booksData.map((book) => ({
+        ...book,
+        rating: book.rating || (Math.random() * 2 + 3).toFixed(1),
+        pages: book.pages || book.pageCount || Math.floor(Math.random() * 200) + 150,
+        readingTime: book.readingTime || `${Math.floor((book.pages || 200) / 2)} min read`
+      }));
+
+      setBooks(enhancedBooks);
+      setFilteredBooks(enhancedBooks);
+
+      try {
+        localStorage.setItem('books_cache_v1', JSON.stringify(enhancedBooks));
+      } catch (e) {
+        // ignore quota errors
+      }
+    } catch (error) {
+      console.error('Error fetching books:', error);
+      setBooks([]);
+      setFilteredBooks([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const displayBooks = filteredBooks.length > 0 ? filteredBooks : books;
+
+  // Category mapping function to match books to categories
+  const matchBookToCategory = (book, categoryKeywords) => {
+    const bookCategory = (book.category || '').toLowerCase();
+    return categoryKeywords.some(keyword => bookCategory.includes(keyword.toLowerCase()));
+  };
 
   if (loading) {
     return (

@@ -55,6 +55,11 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 // JSON file for storing book metadata
 const BOOKS_FILE = path.join(__dirname, 'books.json');
 const BLOGS_FILE = path.join(__dirname, 'blogs.json');
+const SECTIONS_FILE = path.join(__dirname, 'sections.json');
+
+let booksCache = null;
+let booksCacheAtMs = 0;
+const BOOKS_CACHE_TTL_MS = parseInt(process.env.BOOKS_CACHE_TTL_MS || '60000', 10);
 
 // Initialize books.json if it doesn't exist
 async function initBooksFile() {
@@ -76,8 +81,68 @@ async function initBlogsFile() {
   }
 }
 
+async function initSectionsFile() {
+  try {
+    await fs.access(SECTIONS_FILE);
+  } catch {
+    const defaultSections = [
+      {
+        id: 'section_literature',
+        title: 'ရသစာပေများ',
+        route: 'ရသစာပေ',
+        keywords: ['literature', 'arts', 'ရသစာပေ', 'fiction', 'novel', 'story']
+      },
+      {
+        id: 'section_success',
+        title: 'အောင်မြင်ရေးစာပေများ',
+        route: 'အောင်မြင်ရေး',
+        keywords: ['success', 'self-help', 'အောင်မြင်ရေး', 'motivation', 'business', 'achievement']
+      },
+      {
+        id: 'section_comic',
+        title: 'ရုပ်ပြစာအုပ်များ',
+        route: 'ရုပ်ပြ',
+        keywords: ['comic', 'ရုပ်ပြ', 'graphic', 'manga', 'cartoon']
+      },
+      {
+        id: 'section_short',
+        title: 'ဝတ္ထုတိုများ',
+        route: 'ဝတ္ထုတို',
+        keywords: ['short story', 'ဝတ္ထုတို', 'short', 'story collection']
+      },
+      {
+        id: 'section_knowledge',
+        title: 'သုတစာပေများ',
+        route: 'သုတ',
+        keywords: ['non-fiction', 'knowledge', 'သုတ', 'education', 'reference', 'science', 'history']
+      },
+      {
+        id: 'section_poetry',
+        title: 'ကဗျာစာအုပ်များ',
+        route: 'ကဗျာ',
+        keywords: ['poetry', 'poem', 'ကဗျာ', 'verse']
+      },
+      {
+        id: 'section_translated',
+        title: 'ဘာသာပြန်စာအုပ်များ',
+        route: 'ဘာသာပြန်',
+        keywords: ['translated', 'ဘာသာပြန်', 'translation']
+      },
+      {
+        id: 'section_religion',
+        title: 'ဘာသာရေးစာအုပ်များ',
+        route: 'ဘာသာရေး',
+        keywords: ['religious', 'religion', 'ဘာသာရေး', 'spiritual', 'faith', 'buddhism', 'christian']
+      }
+    ];
+    await fs.writeFile(SECTIONS_FILE, JSON.stringify(defaultSections, null, 2));
+    console.log('📝 Created sections.json file');
+  }
+}
+
 initBooksFile();
 initBlogsFile();
+initSectionsFile();
 
 const hasB2Credentials =
   process.env.B2_APPLICATION_KEY_ID &&
@@ -388,12 +453,18 @@ async function downloadBooksJsonFromB2() {
 
 // Helper functions for books - use Backblaze B2 for persistence
 async function getBooks() {
+  if (booksCache && Date.now() - booksCacheAtMs < BOOKS_CACHE_TTL_MS) {
+    return booksCache;
+  }
+
   // Prefer Backblaze B2 persistence (works on ephemeral hosts like Render)
   if (hasB2Credentials) {
     const b2Books = await downloadBooksJsonFromB2();
     if (Array.isArray(b2Books)) {
       console.log(`✅ Loaded ${b2Books.length} books from Backblaze data/books.json`);
-      return b2Books;
+      booksCache = b2Books;
+      booksCacheAtMs = Date.now();
+      return booksCache;
     }
   }
 
@@ -402,7 +473,9 @@ async function getBooks() {
     const data = await fs.readFile(BOOKS_FILE, 'utf8');
     const books = JSON.parse(data);
     console.log(`✅ Read ${books.length} books from local books.json`);
-    return books;
+    booksCache = books;
+    booksCacheAtMs = Date.now();
+    return booksCache;
   } catch (error) {
     console.warn('⚠️ books.json not found or corrupted, falling back to Cloudinary:', error.message);
 
@@ -411,7 +484,9 @@ async function getBooks() {
 
     if (!hasCloudinaryCredentials) {
       console.warn('⚠️ Cloudinary not configured; cannot list books without books.json. Returning empty list.');
-      return result;
+      booksCache = result;
+      booksCacheAtMs = Date.now();
+      return booksCache;
     }
 
     try {
@@ -503,34 +578,42 @@ async function getBooks() {
           pdfParts
         });
       }
-    } catch (err) {
-      console.error('Error building book list from providers:', err.message || err);
-    }
 
-    return result;
+      // Cache the result for 30 minutes
+      booksCache = result;
+      booksCacheAtMs = Date.now();
+      return booksCache;
+    } catch (error) {
+      console.warn('⚠️ Failed to list cover assets from Cloudinary:', error.message);
+      // Cache the result for 30 minutes
+      booksCache = result;
+      booksCacheAtMs = Date.now();
+      return booksCache;
+    }
   }
 }
 
 async function saveBooks(books) {
   try {
-    console.log('💾 DEBUG: saveBooks called with books count:', books.length);
-    console.log('💾 DEBUG: books.json path:', BOOKS_FILE);
     const jsonString = JSON.stringify(books, null, 2);
     console.log('💾 DEBUG: JSON string length:', jsonString.length);
-    
+
     await fs.writeFile(BOOKS_FILE, jsonString);
     console.log(`✅ DEBUG: Successfully saved ${books.length} books to books.json`);
+
+    booksCache = books;
+    booksCacheAtMs = Date.now();
 
     if (hasB2Credentials) {
       const uploaded = await uploadBooksJsonToB2(books);
       console.log(`📤 DEBUG: Upload books.json to Backblaze result: ${uploaded}`);
     }
-    
+
     // Verify the write
     const verifyData = await fs.readFile(BOOKS_FILE, 'utf8');
     const verifyBooks = JSON.parse(verifyData);
     console.log('💾 DEBUG: Verification - books in file after save:', verifyBooks.length);
-    
+
     return true;
   } catch (error) {
     console.error('❌ DEBUG: Error saving books:', error);
@@ -558,6 +641,42 @@ async function saveBlogs(blogs) {
   }
 }
 
+async function getSections() {
+  try {
+    const data = await fs.readFile(SECTIONS_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('Error reading sections:', error);
+    return [];
+  }
+}
+
+async function saveSections(sections) {
+  try {
+    await fs.writeFile(SECTIONS_FILE, JSON.stringify(sections, null, 2));
+  } catch (error) {
+    console.error('Error saving sections:', error);
+    throw error;
+  }
+}
+
+function normalizeKeywords(keywords) {
+  if (!keywords) return [];
+  if (Array.isArray(keywords)) {
+    return keywords
+      .map((k) => (k === null || k === undefined ? '' : String(k)).trim())
+      .filter(Boolean);
+  }
+  if (typeof keywords === 'string') {
+    return keywords
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 // Middleware to verify admin password
 function verifyAdminPassword(req, res, next) {
   const password = req.headers['x-admin-password'] || req.body.adminPassword;
@@ -573,17 +692,97 @@ function verifyAdminPassword(req, res, next) {
   next();
 }
 
+app.get('/api/sections', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    const sections = await getSections();
+    res.json(sections);
+  } catch (error) {
+    console.error('Error fetching sections:', error);
+    res.status(500).json({ error: 'Failed to fetch sections' });
+  }
+});
+
+app.post('/api/admin/sections', verifyAdminPassword, async (req, res) => {
+  try {
+    const { title, route, keywords } = req.body || {};
+    if (!title || !String(title).trim()) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    if (!route || !String(route).trim()) {
+      return res.status(400).json({ error: 'Route is required' });
+    }
+
+    const sections = await getSections();
+    const newSection = {
+      id: `section_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      title: String(title).trim(),
+      route: String(route).trim(),
+      keywords: normalizeKeywords(keywords)
+    };
+    sections.push(newSection);
+    await saveSections(sections);
+    res.status(201).json(newSection);
+  } catch (error) {
+    console.error('Error creating section:', error);
+    res.status(500).json({ error: 'Failed to create section' });
+  }
+});
+
+app.put('/api/admin/sections/:id', verifyAdminPassword, async (req, res) => {
+  try {
+    const { title, route, keywords } = req.body || {};
+    const sections = await getSections();
+    const index = sections.findIndex((s) => s.id === req.params.id);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Section not found' });
+    }
+
+    const updated = {
+      ...sections[index],
+      title: title !== undefined ? String(title).trim() : sections[index].title,
+      route: route !== undefined ? String(route).trim() : sections[index].route,
+      keywords: keywords !== undefined ? normalizeKeywords(keywords) : (sections[index].keywords || [])
+    };
+
+    if (!updated.title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    if (!updated.route) {
+      return res.status(400).json({ error: 'Route is required' });
+    }
+
+    sections[index] = updated;
+    await saveSections(sections);
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating section:', error);
+    res.status(500).json({ error: 'Failed to update section' });
+  }
+});
+
+app.delete('/api/admin/sections/:id', verifyAdminPassword, async (req, res) => {
+  try {
+    const sections = await getSections();
+    const nextSections = sections.filter((s) => s.id !== req.params.id);
+    if (nextSections.length === sections.length) {
+      return res.status(404).json({ error: 'Section not found' });
+    }
+    await saveSections(nextSections);
+    res.json({ success: true, deletedId: req.params.id });
+  } catch (error) {
+    console.error('Error deleting section:', error);
+    res.status(500).json({ error: 'Failed to delete section' });
+  }
+});
+
 // Serve cover image - Moved to later in the file (around line 1500) to use proxy logic
 // app.get('/api/books/:id/cover', ...);
 
 // Get all books
 app.get('/api/books', async (req, res) => {
   try {
-    // Disable caching to avoid stale lists
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
 
     const books = await getBooks();
     
@@ -1533,52 +1732,26 @@ app.get('/api/books/:id/view', async (req, res) => {
     
     // Handle PDF parts - return first part
     if (book.pdfParts && book.pdfParts.length > 0) {
-      if (process.env.B2_CDN_BASE_URL && hasB2Credentials) {
-        const partsWithUrls = await Promise.all(
-          book.pdfParts
-            .slice()
-            .sort((a, b) => a.partNumber - b.partNumber)
-            .map(async (p) => ({
-              partNumber: p.partNumber,
-              b2FileName: p.b2FileName,
-              viewUrl: await getB2CdnUrl(p.b2FileName)
-            }))
-        );
-
-        const firstPartUrl = partsWithUrls.find(p => p.partNumber === 1)?.viewUrl;
-        if (firstPartUrl) {
-          return res.json({
-            viewUrl: firstPartUrl,
-            isSplit: true,
-            totalParts: book.pdfParts.length,
-            parts: partsWithUrls
-          });
-        }
-      }
-
       const protocol = getProtocol(req);
       const proxyUrl = `${protocol}://${req.get('host')}/api/books/${req.params.id}/pdf/part/1`;
       return res.json({
         viewUrl: proxyUrl,
         isSplit: true,
         totalParts: book.pdfParts.length,
-        parts: book.pdfParts.map(p => ({
-          partNumber: p.partNumber,
-          b2FileName: p.b2FileName
-        }))
+        parts: book.pdfParts
+          .slice()
+          .sort((a, b) => a.partNumber - b.partNumber)
+          .map(p => ({
+            partNumber: p.partNumber,
+            b2FileName: p.b2FileName,
+            viewUrl: `${protocol}://${req.get('host')}/api/books/${req.params.id}/pdf/part/${p.partNumber}`
+          }))
       });
     }
     
     const fileName = book.b2FileName || book.fileName;
     
     if (fileName) {
-      if (process.env.B2_CDN_BASE_URL && hasB2Credentials) {
-        const cdnUrl = await getB2CdnUrl(fileName);
-        if (cdnUrl) {
-          return res.json({ viewUrl: cdnUrl, isSplit: false });
-        }
-      }
-
       const protocol = getProtocol(req);
       const proxyUrl = `${protocol}://${req.get('host')}/api/books/${req.params.id}/pdf`;
       return res.json({ viewUrl: proxyUrl, isSplit: false });
@@ -1625,7 +1798,7 @@ app.get('/api/books/:id/pdf', async (req, res) => {
       console.error('B2 credentials not configured');
       return res.status(500).json({ error: 'Backblaze B2 is not configured' });
     }
-    
+
     console.log('Generating signed URL for PDF:', fileName);
     
     try {
@@ -1658,16 +1831,11 @@ app.get('/api/books/:id/pdf', async (req, res) => {
       
       console.log(`✅ Generated signed URL for ${fileName}`);
       
-      // Stream the file content through the server to avoid CORS
-      console.log('🔄 Proxying file stream from B2...');
-      
       const b2Response = await axios({
         method: 'GET',
         url: signedUrl,
         responseType: 'stream',
-        validateStatus: function (status) {
-          return status >= 200 && status < 300; // Only accept successful responses
-        }
+        validateStatus: (status) => status >= 200 && status < 300
       });
 
       // Set headers
@@ -1681,16 +1849,18 @@ app.get('/api/books/:id/pdf', async (req, res) => {
       if (b2Response.headers['etag']) {
         res.setHeader('ETag', b2Response.headers['etag']);
       }
-      
+
       // Pipe the stream
       b2Response.data.pipe(res);
-      
+
       b2Response.data.on('error', (err) => {
         console.error('Stream error:', err);
         if (!res.headersSent) {
           res.status(500).json({ error: 'Stream error' });
         }
       });
+
+      return;
 
     } catch (error) {
       if (error.response && error.response.status === 401) {

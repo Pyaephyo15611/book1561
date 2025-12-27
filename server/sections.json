@@ -1,0 +1,100 @@
+[
+  {
+    "id": "section_literature",
+    "title": "ရသစာပေများ",
+    "route": "ရသစာပေ",
+    "keywords": [
+      "literature",
+      "arts",
+      "ရသစာပေ",
+      "fiction",
+      "novel",
+      "story"
+    ]
+  },
+  {
+    "id": "section_success",
+    "title": "အောင်မြင်ရေးစာပေများ",
+    "route": "အောင်မြင်ရေး",
+    "keywords": [
+      "success",
+      "self-help",
+      "အောင်မြင်ရေး",
+      "motivation",
+      "business",
+      "achievement"
+    ]
+  },
+  {
+    "id": "section_comic",
+    "title": "ရုပ်ပြစာအုပ်များ",
+    "route": "ရုပ်ပြ",
+    "keywords": [
+      "comic",
+      "ရုပ်ပြ",
+      "graphic",
+      "manga",
+      "cartoon"
+    ]
+  },
+  {
+    "id": "section_short",
+    "title": "ဝတ္ထုတိုများ",
+    "route": "ဝတ္ထုတို",
+    "keywords": [
+      "short story",
+      "ဝတ္ထုတို",
+      "short",
+      "story collection"
+    ]
+  },
+  {
+    "id": "section_knowledge",
+    "title": "သုတစာပေများ",
+    "route": "သုတ",
+    "keywords": [
+      "non-fiction",
+      "knowledge",
+      "သုတ",
+      "education",
+      "reference",
+      "science",
+      "history"
+    ]
+  },
+  {
+    "id": "section_poetry",
+    "title": "ကဗျာစာအုပ်များ",
+    "route": "ကဗျာ",
+    "keywords": [
+      "poetry",
+      "poem",
+      "ကဗျာ",
+      "verse"
+    ]
+  },
+  {
+    "id": "section_translated",
+    "title": "ဘာသာပြန်စာအုပ်များ",
+    "route": "ဘာသာပြန်",
+    "keywords": [
+      "translated",
+      "ဘာသာပြန်",
+      "translation"
+    ]
+  },
+  {
+    "id": "section_religion",
+    "title": "ဘာသာရေးစာအုပ်များ",
+    "route": "ဘာသာရေး",
+    "keywords": [
+      "religious",
+      "religion",
+      "ဘာသာရေး",
+      "spiritual",
+      "faith",
+      "buddhism",
+      "christian"
+    ]
+  }
+]
