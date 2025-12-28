@@ -14,6 +14,7 @@ import {
 import { motion } from 'framer-motion';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import CategorySection from '../components/CategorySection';
+import BookSkeleton from '../components/BookSkeleton';
 import { API_URL } from '../utils/apiConfig';
 import './Home.css';
 import bannerLogo from '../assets/logo.png';
@@ -77,32 +78,33 @@ const Home = () => {
       lastFetchAtRef.current = Date.now();
       let booksData = [];
 
-      // Try API first
+      // Try API first with no timeout limit
       try {
-        const response = await axios.get(`${API_URL}/api/books`, { timeout: 2000 });
+        console.log('Fetching books from API...');
+        const response = await axios.get(`${API_URL}/api/books`);
         booksData = response.data;
+        console.log('API fetch successful, got', booksData.length, 'books');
       } catch (apiError) {
-        console.log('API not available or timed out, considering Firestore fallback');
-        if (books.length === 0) {
-          try {
-            const snapshot = await Promise.race([
-              getDocs(collection(db, 'books')),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
-            ]);
-            snapshot.forEach((doc) => {
-              booksData.push({
-                id: doc.id,
-                ...doc.data()
-              });
+        console.log('API not available, trying Firestore fallback:', apiError.message);
+        
+        // Always try Firestore fallback when API fails
+        try {
+          console.log('Fetching books from Firestore...');
+          const snapshot = await getDocs(collection(db, 'books'));
+          snapshot.forEach((doc) => {
+            booksData.push({
+              id: doc.id,
+              ...doc.data()
             });
-          } catch (fsErr) {
-            console.warn('Firestore fallback failed or timed out');
-          }
+          });
+          console.log('Firestore fetch successful, got', booksData.length, 'books');
+        } catch (fsErr) {
+          console.error('Firestore fallback failed:', fsErr.message);
         }
       }
 
       if (booksData.length === 0) {
-        console.warn('No books found');
+        console.warn('No books found from any source');
       }
 
       const enhancedBooks = booksData.map((book) => ({
@@ -118,7 +120,7 @@ const Home = () => {
       try {
         localStorage.setItem('books_cache_v1', JSON.stringify(enhancedBooks));
       } catch (e) {
-        // ignore quota errors
+        console.warn('Failed to cache books:', e.message);
       }
     } catch (error) {
       console.error('Error fetching books:', error);
@@ -127,7 +129,7 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
-  }, [books.length]);
+  }, []);
 
   useEffect(() => {
     try {
@@ -368,21 +370,7 @@ const Home = () => {
                 <div className="news-books-scroll" ref={newsBooksScrollRef}>
                   <div className="news-books-container">
                     {Array.from({ length: 8 }).map((_, index) => (
-                      <div key={index} className="news-book-card deco-card" style={{ cursor: 'default' }}>
-                        <div className="deco-corner deco-top deco-left"></div>
-                        <div className="deco-corner deco-top deco-right"></div>
-                        <div className="deco-corner deco-bottom deco-left"></div>
-                        <div className="deco-corner deco-bottom deco-right"></div>
-                        <div className="trending-cover">
-                          <div style={{ width: '100%', paddingTop: '150%', background: '#eee', borderRadius: '4px' }} />
-                        </div>
-                        <p className="trending-book-title">
-                          <span style={{ display: 'inline-block', width: '80%', height: '14px', background: '#eee', borderRadius: '4px' }} />
-                        </p>
-                        <p className="trending-book-author">
-                          <span style={{ display: 'inline-block', width: '60%', height: '12px', background: '#f0f0f0', borderRadius: '4px' }} />
-                        </p>
-                      </div>
+                      <BookSkeleton key={index} />
                     ))}
                   </div>
                 </div>
@@ -448,6 +436,7 @@ const Home = () => {
                   title={category.title}
                   books={categoryBooks}
                   categoryRoute={category.route}
+                  loading={loading}
                 />
               );
             })}

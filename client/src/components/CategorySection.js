@@ -2,8 +2,9 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getCoverImageUrl } from '../utils/coverImage';
+import BookSkeleton from './BookSkeleton';
 
-const CategorySection = ({ title, books, categoryRoute }) => {
+const CategorySection = ({ title, books, categoryRoute, loading }) => {
   const navigate = useNavigate();
 
   // Always show section, even if empty
@@ -22,7 +23,13 @@ const CategorySection = ({ title, books, categoryRoute }) => {
             </button>
           </div>
         </div>
-        {books.length > 0 ? (
+        {loading ? (
+          <div className="trending-grid">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <BookSkeleton key={index} />
+            ))}
+          </div>
+        ) : books.length > 0 ? (
           <div className="trending-grid">
             {books.slice(0, 8).map((book, index) => (
               <motion.div
