@@ -114,8 +114,22 @@ const Home = () => {
         readingTime: book.readingTime || `${Math.floor((book.pages || 200) / 2)} min read`
       }));
 
-      setBooks(enhancedBooks);
-      setFilteredBooks(enhancedBooks);
+      // Sort books by creation date (newest first) or by ID if no date available
+      const sortedBooks = enhancedBooks.sort((a, b) => {
+        // Try to sort by createdAt timestamp first
+        if (a.createdAt && b.createdAt) {
+          return new Date(b.createdAt) - new Date(a.createdAt);
+        }
+        // Fallback to sorting by ID (assuming newer IDs are larger)
+        if (a.id && b.id) {
+          return b.id.localeCompare(a.id);
+        }
+        // Final fallback to maintain original order
+        return 0;
+      });
+
+      setBooks(sortedBooks);
+      setFilteredBooks(sortedBooks);
 
       try {
         localStorage.setItem('books_cache_v1', JSON.stringify(enhancedBooks));
@@ -422,14 +436,15 @@ const Home = () => {
           </div>
         </section>
 
-        {/* Category Sections - Always show all sections */}
-        {!searchTerm && (
-          <>
-            {categorySections.map((category) => {
-              const categoryBooks = displayBooks.filter(book => 
-                matchBookToCategory(book, category.keywords)
-              );
-              
+        {/* Category Sections - Show filtered results when searching */}
+        <>
+          {categorySections.map((category) => {
+            const categoryBooks = displayBooks.filter(book => 
+              matchBookToCategory(book, category.keywords)
+            );
+            
+            // Only show section if it has books (either when not searching or when searching has matches)
+            if (!searchTerm || categoryBooks.length > 0) {
               return (
                 <CategorySection
                   key={category.title}
@@ -439,9 +454,10 @@ const Home = () => {
                   loading={loading}
                 />
               );
-            })}
-          </>
-        )}
+            }
+            return null;
+          })}
+        </>
 
       </main>
 

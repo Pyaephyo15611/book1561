@@ -1,0 +1,125 @@
+/* 2x3 Grid Layout */
+.grid-2x3 {
+  display: grid !important;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1rem;
+  max-width: 100%;
+}
+
+/* Category Section Container */
+.section.trending-books {
+  position: relative;
+  padding-bottom: 4rem; /* Increased space for pagination */
+}
+
+/* Simple Small Pagination */
+.pagination-controls {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.pagination-btn {
+  padding: 0.2rem 0.4rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.7rem;
+  font-weight: 500;
+  min-width: 30px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 0.7rem;
+  color: #6c757d;
+  font-weight: 500;
+  padding: 0 0.5rem;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .grid-2x3 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .section.trending-books {
+    padding-bottom: 3.5rem; /* Increased space for pagination */
+  }
+  
+  .pagination-controls {
+    gap: 0.25rem;
+    padding: 0.2rem 0.3rem;
+  }
+  
+  .pagination-btn {
+    padding: 0.15rem 0.3rem;
+    font-size: 0.65rem;
+    min-width: 25px;
+    height: 24px;
+  }
+  
+  .pagination-info {
+    font-size: 0.65rem;
+    padding: 0 0.3rem;
+    min-width: 35px;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-2x3 {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+  
+  .section.trending-books {
+    padding-bottom: 3.5rem; /* Increased space for pagination */
+  }
+  
+  .pagination-controls {
+    gap: 0.2rem;
+    padding: 0.15rem 0.25rem;
+  }
+  
+  .pagination-btn {
+    padding: 0.1rem 0.25rem;
+    font-size: 0.6rem;
+    min-width: 22px;
+    height: 20px;
+  }
+  
+  .pagination-info {
+    font-size: 0.6rem;
+    padding: 0 0.25rem;
+    min-width: 30px;
+  }
+}
