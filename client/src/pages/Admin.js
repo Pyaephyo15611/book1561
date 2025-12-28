@@ -10,11 +10,9 @@ const Admin = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
-  const [sections, setSections] = useState([]);
-  const [sectionsLoading, setSectionsLoading] = useState(false);
-  const [editingSectionId, setEditingSectionId] = useState(null);
-  const [sectionForm, setSectionForm] = useState({ title: '', route: '', keywords: '' });
-  
+  // Sections management state (currently not rendered in UI)
+  // Keeping state minimal to avoid unused variables during build
+    
   const [formData, setFormData] = useState({
     title: '',
     author: '',
@@ -42,144 +40,11 @@ const Admin = () => {
     }
   };
 
-  const fetchSections = async () => {
-    setSectionsLoading(true);
-    try {
-      const url = `${API_URL || ''}/api/sections`;
-      const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const ct = (response.headers.get('content-type') || '').toLowerCase();
-      if (!ct.includes('application/json')) {
-        throw new Error('Unexpected response type');
-      }
-      const data = await response.json();
-      setSections(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error fetching sections:', err);
-      setSections([]);
-    } finally {
-      setSectionsLoading(false);
-    }
-  };
-
-  const resetSectionForm = () => {
-    setEditingSectionId(null);
-    setSectionForm({ title: '', route: '', keywords: '' });
-  };
-
-  const handleSectionEdit = (section) => {
-    setEditingSectionId(section.id);
-    setSectionForm({
-      title: section.title || '',
-      route: section.route || '',
-      keywords: Array.isArray(section.keywords) ? section.keywords.join(', ') : ''
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleSectionSave = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      if (!sectionForm.title.trim()) {
-        throw new Error('Section title is required');
-      }
-      if (!sectionForm.route.trim()) {
-        throw new Error('Section route is required');
-      }
-
-      const body = {
-        title: sectionForm.title,
-        route: sectionForm.route,
-        keywords: sectionForm.keywords
-      };
-
-      const url = editingSectionId
-        ? `${API_URL || ''}/api/admin/sections/${editingSectionId}`
-        : `${API_URL || ''}/api/admin/sections`;
-      const method = editingSectionId ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'x-admin-password': adminPassword
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (!response.ok) {
-        let msg = `HTTP ${response.status}`;
-        try {
-          const ct = (response.headers.get('content-type') || '').toLowerCase();
-          if (ct.includes('application/json')) {
-            const j = await response.json();
-            msg = j.error || msg;
-          }
-        } catch {}
-        throw new Error(msg);
-      }
-
-      const data = await response.json();
-
-      setSuccess(editingSectionId ? 'Section updated' : 'Section created');
-      resetSectionForm();
-      fetchSections();
-    } catch (err) {
-      console.error('Section save error:', err);
-      setError(err.message || 'Failed to save section');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSectionDelete = async (sectionId) => {
-    if (!window.confirm('Delete this section?')) return;
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const response = await fetch(`${API_URL || ''}/api/admin/sections/${sectionId}`, {
-        method: 'DELETE',
-        headers: {
-          'Accept': 'application/json',
-          'x-admin-password': adminPassword
-        }
-      });
-
-      if (!response.ok) {
-        let msg = `HTTP ${response.status}`;
-        try {
-          const ct = (response.headers.get('content-type') || '').toLowerCase();
-          if (ct.includes('application/json')) {
-            const j = await response.json();
-            msg = j.error || msg;
-          }
-        } catch {}
-        throw new Error(msg);
-      }
-
-      const data = await response.json();
-      setSuccess('Section deleted');
-      if (editingSectionId === sectionId) {
-        resetSectionForm();
-      }
-      fetchSections();
-    } catch (err) {
-      console.error('Section delete error:', err);
-      setError(err.message || 'Failed to delete section');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  
+  
+  
+  
+  
   React.useEffect(() => {
     if (isAuthenticated) {
       fetchBooks();
@@ -263,7 +128,7 @@ const Admin = () => {
         } catch {}
         throw new Error(msg);
       }
-      const data = await response.json();
+      await response.json();
       setSuccess('Book deleted');
       fetchBooks();
     } catch (err) {
@@ -296,7 +161,7 @@ const Admin = () => {
         } catch {}
         throw new Error(msg);
       }
-      const data = await response.json();
+      await response.json();
       setSuccess(`Trending ${!book.isTrending ? 'enabled' : 'disabled'}`);
       fetchBooks();
     } catch (err) {
@@ -406,7 +271,7 @@ const Admin = () => {
         throw new Error(msg);
       }
 
-      const data = await response.json();
+      await response.json();
 
       setSuccess(editingId ? 'Book updated successfully!' : 'Book uploaded successfully!');
       setFormData({

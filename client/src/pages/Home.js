@@ -123,6 +123,8 @@ const Home = () => {
       }
     };
     fetchSections();
+    // defaultCategorySections is a constant defined in render scope; safe to ignore per ESLint rules
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [API_URL]);
 
   useEffect(() => {
