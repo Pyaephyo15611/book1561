@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { collection, getDocs } from 'firebase/firestore';
@@ -99,7 +99,7 @@ const Home = () => {
 
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
-  }, []);
+  }, [fetchBooks]);
 
   useEffect(() => {
     const fetchSections = async () => {
@@ -143,7 +143,7 @@ const Home = () => {
     setFilteredBooks(filtered);
   }, [searchTerm, books]);
 
-  const fetchBooks = async () => {
+  const fetchBooks = useCallback(async () => {
     try {
       lastFetchAtRef.current = Date.now();
       let booksData = [];
@@ -198,7 +198,7 @@ const Home = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [books.length]);
 
   const displayBooks = filteredBooks.length > 0 ? filteredBooks : books;
 
