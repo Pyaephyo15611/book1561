@@ -22,6 +22,7 @@ const B2Reader = () => {
   const [pdfUrl, setPdfUrl] = useState('');
   const [pageInput, setPageInput] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [containerWidth, setContainerWidth] = useState(window.innerWidth);
   const scrollerRef = useRef(null);
 
   // Fetch book details for title
@@ -79,9 +80,39 @@ const B2Reader = () => {
     setCurrentPage(target);
   }
 
+  // Handle window resize and container width changes
+  useEffect(() => {
+    const handleResize = () => {
+      if (scrollerRef.current) {
+        setContainerWidth(scrollerRef.current.clientWidth);
+      }
+    };
+
+    // Initial width
+    handleResize();
+
+    // Add resize observer for container
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (scrollerRef.current) {
+      resizeObserver.observe(scrollerRef.current);
+    }
+
+    // Add window resize listener as fallback
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   const canPrev = currentPage > 1;
   const canNext = numPages ? currentPage < numPages : false;
-  const pageWidth = scrollerRef.current ? Math.min(scrollerRef.current.clientWidth - 24, 1200) : undefined;
+  
+  // Calculate page width with max constraints
+  const maxContentWidth = 1200; // Max width for the content
+  const padding = window.innerWidth < 768 ? 24 : 48; // Less padding on mobile
+  const pageWidth = Math.min(containerWidth - padding, maxContentWidth);
 
   return (
     <div className="b2reader-root">
@@ -141,10 +172,11 @@ const B2Reader = () => {
               <Page
                 pageNumber={currentPage}
                 scale={scale}
-                width={pageWidth}
+                width={pageWidth - 40} // Account for padding
                 renderTextLayer={false}
                 renderAnnotationLayer={false}
                 loading="Loading page..."
+                className="pdf-page"
               />
               <div className="page-label">{currentPage}/{numPages || '--'}</div>
 

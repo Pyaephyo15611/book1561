@@ -150,17 +150,26 @@ const Home = () => {
 
       // Try API first
       try {
-        const response = await axios.get(`${API_URL}/api/books`);
+        const response = await axios.get(`${API_URL}/api/books`, { timeout: 2000 });
         booksData = response.data;
       } catch (apiError) {
-        console.log('API not available, trying Firestore directly');
-        const booksSnapshot = await getDocs(collection(db, 'books'));
-        booksSnapshot.forEach((doc) => {
-          booksData.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
+        console.log('API not available or timed out, considering Firestore fallback');
+        if (books.length === 0) {
+          try {
+            const snapshot = await Promise.race([
+              getDocs(collection(db, 'books')),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500))
+            ]);
+            snapshot.forEach((doc) => {
+              booksData.push({
+                id: doc.id,
+                ...doc.data()
+              });
+            });
+          } catch (fsErr) {
+            console.warn('Firestore fallback failed or timed out');
+          }
+        }
       }
 
       if (booksData.length === 0) {
@@ -199,14 +208,7 @@ const Home = () => {
     return categoryKeywords.some(keyword => bookCategory.includes(keyword.toLowerCase()));
   };
 
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loader"></div>
-      </div>
-    );
-  }
-
+  
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   // Structured Data for Homepage
@@ -362,16 +364,40 @@ const Home = () => {
             </div>
 
             {displayBooks.length === 0 ? (
-              <div className="no-results">
-                <BookOpen size={48} />
-                <h3>No books found</h3>
-                <p>Try a different search term or clear the search box.</p>
-              </div>
+              loading ? (
+                <div className="news-books-scroll" ref={newsBooksScrollRef}>
+                  <div className="news-books-container">
+                    {Array.from({ length: 8 }).map((_, index) => (
+                      <div key={index} className="news-book-card deco-card" style={{ cursor: 'default' }}>
+                        <div className="deco-corner deco-top deco-left"></div>
+                        <div className="deco-corner deco-top deco-right"></div>
+                        <div className="deco-corner deco-bottom deco-left"></div>
+                        <div className="deco-corner deco-bottom deco-right"></div>
+                        <div className="trending-cover">
+                          <div style={{ width: '100%', paddingTop: '150%', background: '#eee', borderRadius: '4px' }} />
+                        </div>
+                        <p className="trending-book-title">
+                          <span style={{ display: 'inline-block', width: '80%', height: '14px', background: '#eee', borderRadius: '4px' }} />
+                        </p>
+                        <p className="trending-book-author">
+                          <span style={{ display: 'inline-block', width: '60%', height: '12px', background: '#f0f0f0', borderRadius: '4px' }} />
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="no-results">
+                  <BookOpen size={48} />
+                  <h3>No books found</h3>
+                  <p>Try a different search term or clear the search box.</p>
+                </div>
+              )
             ) : (
               <div className="news-books-scroll" ref={newsBooksScrollRef}>
                 <div className="news-books-container">
                   {displayBooks
-                    .slice(0, 12)
+                    .slice(0, 8)
                     .filter((book) => book && book.id)
                     .map((book, index) => (
                     <motion.div

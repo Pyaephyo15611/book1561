@@ -77,9 +77,10 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  gap: 16px;
-  padding: 16px;
+  padding: 0;
   background: #202225;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .b2reader-document {
@@ -93,16 +94,21 @@
   position: relative;
   background: #2f3136;
   border-radius: 6px;
-  padding: 8px;
+  padding: 20px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  width: min(1200px, 100%);
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .b2reader-page canvas {
   display: block;
+  max-width: 100%;
   height: auto !important;
-  max-height: calc(100vh - 140px);
-  width: 100% !important;
+  width: auto !important;
+  margin: 0 auto;
+  max-height: calc(100vh - 180px);
+  object-fit: contain;
 }
 
 .page-label {
@@ -118,14 +124,29 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .b2reader-topbar { padding: 8px 10px; }
-  .zoom-percent { display: none; }
-  .b2reader-page canvas { max-height: calc(100vh - 120px); }
+  .b2reader-topbar { 
+    padding: 8px 10px; 
+  }
+  .b2reader-page {
+    padding: 12px;
+  }
+  .b2reader-page canvas { 
+    max-height: calc(100vh - 160px); 
+  }
+  .jump-input {
+    width: 80px;
+  }
 }
 
 @media (min-width: 769px) {
   .b2reader-scroller {
-    padding: 24px;
+    padding: 20px;
+  }
+  .b2reader-page {
+    padding: 30px;
+  }
+  .b2reader-page canvas {
+    max-height: calc(100vh - 200px);
   }
   .jump-input {
     width: 110px;

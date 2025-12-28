@@ -57,12 +57,6 @@ const Navbar = ({ user, darkMode, onToggleDarkMode }) => {
                 <LogIn className="icon" /> Sign In
               </Link>
             )}
-            
-            {user?.uid === process.env.REACT_APP_ADMIN_UID && (
-              <Link to="/admin" className="btn btn-primary" onClick={closeMenu}>
-                Admin Panel
-              </Link>
-            )}
           </div>
         </div>
         
