@@ -4,7 +4,7 @@ main = "workers-site/index.js"
 compatibility_date = "2025-12-29"
 
 [site]
-bucket = "./dist"
+bucket = "./workers-site/dist"
 
 [build]
-command = "cd client && npm run build && mv build ../dist"
+command = "cd client && npm run build && mv build ../workers-site/dist"
