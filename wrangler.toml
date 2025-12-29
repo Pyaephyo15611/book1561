@@ -7,3 +7,11 @@ directory = "client/build"
 # Exclude server dependencies from bundling
 [build]
 command = "cd client && npm run build"
+
+# Handle React SPA routing
+[[routes]]
+pattern = "/*"
+fallback = "/index.html"
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
