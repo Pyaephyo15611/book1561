@@ -1,9 +1,10 @@
+# Cloudflare Workers configuration
 name = "bookstore"
 main = "worker.js"
 compatibility_date = "2025-12-29"
 
-[assets]
-directory = "./dist"
+[site]
+bucket = "./dist"
 
 [build]
-command = "cd client && npm run build && mv build ../dist"
+command = "cd client && npm run build && rm -rf ../dist && mv dist ../dist"
