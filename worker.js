@@ -1,14 +1,16 @@
 export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url)
-    const pathname = url.pathname
-    
-    // Handle static assets
-    if (pathname.includes('.')) {
-      return fetch(request)
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    // Try to serve the requested asset first
+    try {
+      return await env.ASSETS.fetch(request);
+    } catch {
+      // If asset not found, serve index.html for SPA routing
+      return await env.ASSETS.fetch(
+        new Request(`${url.origin}/index.html`, request)
+      );
     }
-    
-    // For all other routes, serve index.html
-    return env.ASSETS.fetch(new Request('/index.html', request))
   }
-}
+};
+
