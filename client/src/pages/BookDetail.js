@@ -160,6 +160,10 @@ const BookDetail = () => {
       },
       (error) => {
         console.error('Error loading reviews:', error);
+        // Handle permission errors gracefully
+        if (error.code === 'permission-denied') {
+          console.warn('Firestore permissions not configured - reviews disabled');
+        }
         setReviews([]);
         setReviewsLoading(false);
       }
@@ -195,6 +199,10 @@ const BookDetail = () => {
       },
       (error) => {
         console.error('Error loading replies:', error);
+        // Handle permission errors gracefully
+        if (error.code === 'permission-denied') {
+          console.warn('Firestore permissions not configured - replies disabled');
+        }
         setReplies([]);
         setRepliesLoading(false);
       }
