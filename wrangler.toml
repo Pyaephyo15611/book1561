@@ -1,6 +1,5 @@
 # Cloudflare Workers configuration - Updated
 name = "bookstore"
-main = "worker.js"
 compatibility_date = "2025-12-29"
 
 [site]
