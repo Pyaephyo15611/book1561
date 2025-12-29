@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore/lite';
 import { db } from '../firebase/config';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';

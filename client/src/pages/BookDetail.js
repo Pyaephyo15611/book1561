@@ -9,7 +9,7 @@ import {
   where,
   onSnapshot,
   serverTimestamp
-} from 'firebase/firestore';
+} from 'firebase/firestore/lite';
 import { db, auth } from '../firebase/config';
 import { pdfjs } from 'react-pdf';
 import axios from 'axios';
