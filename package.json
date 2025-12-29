@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "npm run dev --prefix server",
     "client": "npm start --prefix client",
-    "build": "cd client && npx react-scripts build",
+    "build": "cd client && npm ci && npx react-scripts build",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install"
   },
   "keywords": [
