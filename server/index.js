@@ -85,56 +85,98 @@ async function initSectionsFile() {
   try {
     await fs.access(SECTIONS_FILE);
   } catch {
-    const defaultSections = [
-      {
-        id: 'section_literature',
-        title: 'ရသစာပေများ',
-        route: 'ရသစာပေ',
-        keywords: ['literature', 'arts', 'ရသစာပေ', 'fiction', 'novel', 'story']
-      },
-      {
-        id: 'section_success',
-        title: 'အောင်မြင်ရေးစာပေများ',
-        route: 'အောင်မြင်ရေး',
-        keywords: ['success', 'self-help', 'အောင်မြင်ရေး', 'motivation', 'business', 'achievement']
-      },
-      {
-        id: 'section_comic',
-        title: 'ရုပ်ပြစာအုပ်များ',
-        route: 'ရုပ်ပြ',
-        keywords: ['comic', 'ရုပ်ပြ', 'graphic', 'manga', 'cartoon']
-      },
-      {
-        id: 'section_short',
-        title: 'ဝတ္ထုတိုများ',
-        route: 'ဝတ္ထုတို',
-        keywords: ['short story', 'ဝတ္ထုတို', 'short', 'story collection']
-      },
-      {
-        id: 'section_knowledge',
-        title: 'သုတစာပေများ',
-        route: 'သုတ',
-        keywords: ['non-fiction', 'knowledge', 'သုတ', 'education', 'reference', 'science', 'history']
-      },
-      {
-        id: 'section_poetry',
-        title: 'ကဗျာစာအုပ်များ',
-        route: 'ကဗျာ',
-        keywords: ['poetry', 'poem', 'ကဗျာ', 'verse']
-      },
-      {
-        id: 'section_translated',
-        title: 'ဘာသာပြန်စာအုပ်များ',
-        route: 'ဘာသာပြန်',
-        keywords: ['translated', 'ဘာသာပြန်', 'translation']
-      },
-      {
-        id: 'section_religion',
-        title: 'ဘာသာရေးစာအုပ်များ',
-        route: 'ဘာသာရေး',
-        keywords: ['religious', 'religion', 'ဘာသာရေး', 'spiritual', 'faith', 'buddhism', 'christian']
+    // We'll create it below if it doesn't exist
+  }
+
+  const defaultSections = [
+    {
+      id: 'section_literature',
+      title: 'တာရာပွကြီး',
+      route: 'ရသစာပေ',
+      keywords: ['literature', 'arts', 'ရသစာပေ', 'fiction', 'novel', 'story']
+    },
+    {
+      id: 'section_success',
+      title: 'အောင်မြင်ရေးစာပေများ',
+      route: 'အောင်မြင်ရေး',
+      keywords: ['success', 'self-help', 'အောင်မြင်ရေး', 'motivation', 'business', 'achievement']
+    },
+    {
+      id: 'section_comic',
+      title: 'မြိုင်ရာဇာ တွတ်ပီ ',
+      route: 'ရုပ်ပြ',
+      keywords: ['comic', 'ရုပ်ပြ', 'graphic', 'manga', 'cartoon']
+    },
+    {
+      id: 'section_short',
+      title: 'ဘိုဘို',
+      route: 'ဝတ္ထုတို',
+      keywords: ['short story', 'ဝတ္ထုတို', 'short', 'story collection']
+    },
+    {
+      id: 'section_kotint',
+      title: 'ကိုတင့် ကိုရွှေထူး',
+      route: 'ကိုတင့် ကိုရွှေထူး',
+      keywords: ['ကိုတင့်', 'ကိုရွှေထူး', 'tint', 'shwe htoo']
+    },
+    {
+      id: 'section_cartoon_comic',
+      title: 'ကာတွန်းနှင့်ရုပ်ပြများ',
+      route: 'ကာတွန်းနှင့်ရုပ်ပြများ',
+      keywords: ['ကာတွန်း', 'ရုပ်ပြ', 'comic', 'cartoon', 'graphic', 'manga']
+    },
+    {
+      id: 'section_knowledge',
+      title: 'သုတစာပေများ',
+      route: 'သုတ',
+      keywords: ['non-fiction', 'knowledge', 'သုတ', 'education', 'reference', 'science', 'history']
+    },
+    {
+      id: 'section_poetry',
+      title: 'ကဗျာစာအုပ်များ',
+      route: 'ကဗျာ',
+      keywords: ['poetry', 'poem', 'ကဗျာ', 'verse']
+    },
+    {
+      id: 'section_translated',
+      title: 'ဘာသာပြန်စာအုပ်များ',
+      route: 'ဘာသာပြန်',
+      keywords: ['translated', 'ဘာသာပြန်', 'translation']
+    },
+    {
+      id: 'section_religion',
+      title: 'ဘာသာရေးစာအုပ်များ',
+      route: 'ဘာသာရေး',
+      keywords: ['religious', 'religion', 'ဘာသာရေး', 'spiritual', 'faith', 'buddhism', 'christian']
+    }
+  ];
+
+  try {
+    const existingRaw = await fs.readFile(SECTIONS_FILE, 'utf8');
+    const existingParsed = JSON.parse(existingRaw);
+    const existing = Array.isArray(existingParsed) ? existingParsed : [];
+
+    const byRoute = new Map(existing.map((s) => [s && s.route, s]).filter(([r]) => r));
+    const next = [...existing];
+
+    for (const def of defaultSections) {
+      const current = byRoute.get(def.route);
+      if (!current) {
+        next.push(def);
+        continue;
       }
-    ];
+      // Keep existing IDs but update the display title/keywords to match the latest defaults
+      current.title = def.title;
+      current.keywords = Array.isArray(current.keywords) && current.keywords.length > 0 ? current.keywords : def.keywords;
+    }
+
+    const existingJson = JSON.stringify(existing, null, 2);
+    const nextJson = JSON.stringify(next, null, 2);
+    if (nextJson !== existingJson) {
+      await fs.writeFile(SECTIONS_FILE, nextJson);
+      console.log('📝 Updated sections.json file');
+    }
+  } catch {
     await fs.writeFile(SECTIONS_FILE, JSON.stringify(defaultSections, null, 2));
     console.log('📝 Created sections.json file');
   }

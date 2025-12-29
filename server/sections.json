@@ -1,7 +1,7 @@
 [
   {
     "id": "section_literature",
-    "title": "ရသစာပေများ",
+    "title": "တာရာပွကြီး",
     "route": "ရသစာပေ",
     "keywords": [
       "literature",
@@ -27,7 +27,7 @@
   },
   {
     "id": "section_comic",
-    "title": "ရုပ်ပြစာအုပ်များ",
+    "title": "မြိုင်ရာဇာ တွတ်ပီ ",
     "route": "ရုပ်ပြ",
     "keywords": [
       "comic",
@@ -39,7 +39,7 @@
   },
   {
     "id": "section_short",
-    "title": "ဝတ္ထုတိုများ",
+    "title": "ဘိုဘို",
     "route": "ဝတ္ထုတို",
     "keywords": [
       "short story",
@@ -95,6 +95,30 @@
       "faith",
       "buddhism",
       "christian"
+    ]
+  },
+  {
+    "id": "section_kotint",
+    "title": "ကိုတင့် ကိုရွှေထူး",
+    "route": "ကိုတင့် ကိုရွှေထူး",
+    "keywords": [
+      "ကိုတင့်",
+      "ကိုရွှေထူး",
+      "tint",
+      "shwe htoo"
+    ]
+  },
+  {
+    "id": "section_cartoon_comic",
+    "title": "ကာတွန်းနှင့်ရုပ်ပြများ",
+    "route": "ကာတွန်းနှင့်ရုပ်ပြများ",
+    "keywords": [
+      "ကာတွန်း",
+      "ရုပ်ပြ",
+      "comic",
+      "cartoon",
+      "graphic",
+      "manga"
     ]
   }
 ]

@@ -29,7 +29,7 @@ const Home = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const defaultCategorySections = [
     {
-      title: 'ရသစာပေများ',
+      title: 'တာရာပွကြီး',
       keywords: ['literature', 'arts', 'ရသစာပေ', 'fiction', 'novel', 'story'],
       route: 'ရသစာပေ'
     },
@@ -39,14 +39,24 @@ const Home = () => {
       route: 'အောင်မြင်ရေး'
     },
     {
-      title: 'ရုပ်ပြစာအုပ်များ',
+      title: 'မြိုင်ရာဇာ တွတ်ပီ ',
       keywords: ['comic', 'ရုပ်ပြ', 'graphic', 'manga', 'cartoon'],
       route: 'ရုပ်ပြ'
     },
     {
-      title: 'ဝတ္ထုတိုများ',
+      title: 'ဘိုဘို',
       keywords: ['short story', 'ဝတ္ထုတို', 'short', 'story collection'],
       route: 'ဝတ္ထုတို'
+    },
+    {
+      title: 'ကိုတင့် ကိုရွှေထူး',
+      keywords: ['ကိုတင့်', 'ကိုရွှေထူး', 'tint', 'shwe htoo'],
+      route: 'ကိုတင့် ကိုရွှေထူး'
+    },
+    {
+      title: 'ကာတွန်းနှင့်ရုပ်ပြများ',
+      keywords: ['ကာတွန်း', 'ရုပ်ပြ', 'comic', 'cartoon', 'graphic', 'manga'],
+      route: 'ကာတွန်းနှင့်ရုပ်ပြများ'
     },
     {
       title: 'သုတစာပေများ',
@@ -180,10 +190,17 @@ const Home = () => {
         const response = await axios.get(`${API_URL}/api/sections`);
         const data = response.data;
         if (Array.isArray(data) && data.length > 0) {
+          const titleOverrides = {
+            'ရသစာပေ': 'တာရာပွကြီး',
+            'ရုပ်ပြ': 'မြိုင်ရာဇာ တွတ်ပီ ',
+            'ဝတ္ထုတို': 'ဘိုဘို',
+            'ကိုတင့် ကိုရွှေထူး': 'ကိုတင့် ကိုရွှေထူး',
+            'ကာတွန်းနှင့်ရုပ်ပြများ': 'ကာတွန်းနှင့်ရုပ်ပြများ'
+          };
           const normalized = data
             .filter((s) => s && s.title && s.route)
             .map((s) => ({
-              title: s.title,
+              title: titleOverrides[s.route] || s.title,
               route: s.route,
               keywords: Array.isArray(s.keywords) ? s.keywords : []
             }));
@@ -443,8 +460,8 @@ const Home = () => {
               matchBookToCategory(book, category.keywords)
             );
             
-            // Only show section if it has books (either when not searching or when searching has matches)
-            if (!searchTerm || categoryBooks.length > 0) {
+            // Hide empty sections. Keep visible during loading so skeletons can render.
+            if (loading || categoryBooks.length > 0) {
               return (
                 <CategorySection
                   key={category.title}
@@ -478,10 +495,12 @@ const Home = () => {
             <div className="footer-section">
               <h3>စာအုပ်အမျိုးအစားများ</h3>
               <ul className="footer-links">
-                <li><button className="footer-link" onClick={() => navigate('/category/ရသစာပေ')}>ရသစာပေများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ရသစာပေ')}>တာရာပွကြီး</button></li>
                 <li><button className="footer-link" onClick={() => navigate('/category/အောင်မြင်ရေး')}>အောင်မြင်ရေးစာပေများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ရုပ်ပြ')}>ရုပ်ပြစာအုပ်များ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ဝတ္ထုတို')}>ဝတ္ထုတိုများ</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ရုပ်ပြ')}>မြိုင်ရာဇာ တွတ်ပီ </button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ဝတ္ထုတို')}>ဘိုဘို</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ကိုတင့် ကိုရွှေထူး')}>ကိုတင့် ကိုရွှေထူး</button></li>
+                <li><button className="footer-link" onClick={() => navigate('/category/ကာတွန်းနှင့်ရုပ်ပြများ')}>ကာတွန်းနှင့်ရုပ်ပြများ</button></li>
                 <li><button className="footer-link" onClick={() => navigate('/category/သုတ')}>သုတစာပေများ</button></li>
                 <li><button className="footer-link" onClick={() => navigate('/category/ကဗျာ')}>ကဗျာစာအုပ်များ</button></li>
               </ul>
