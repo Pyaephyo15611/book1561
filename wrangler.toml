@@ -1,6 +1,9 @@
 name = "bookstore"
-main = "server/index.js"
 compatibility_date = "2025-12-29"
 
 [assets]
 directory = "client/build"
+
+# Exclude server dependencies from bundling
+[build]
+command = "cd client && npm run build"
