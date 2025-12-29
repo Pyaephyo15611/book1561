@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth/lite';
 import { auth } from '../firebase/config';
 import { LogOut, Menu, X } from 'lucide-react';
 import './Navbar.css';

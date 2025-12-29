@@ -5,7 +5,7 @@ import {
   updateProfile,
   signInWithPopup,
   GoogleAuthProvider
-} from 'firebase/auth';
+} from 'firebase/auth/lite';
 import { doc, setDoc, getDoc } from 'firebase/firestore/lite';
 import { auth, db } from '../firebase/config';
 import { useNavigate } from 'react-router-dom';

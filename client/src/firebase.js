@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore/lite';
-import { getAuth } from 'firebase/auth';
+import { getAuth } from 'firebase/auth/lite';
 import { getStorage } from 'firebase/storage';
 
 // Your web app's Firebase configuration
