@@ -1,0 +1,18 @@
+{
+    "version": 2,
+    "builds": [
+        {
+            "src": "client/package.json",
+            "use": "@vercel/static-build",
+            "config": {
+                "distDir": "client/build"
+            }
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(book|blog|read|category|search|authors|author|admin|login)(/.*)?",
+            "dest": "/index.html"
+        }
+    ]
+}
