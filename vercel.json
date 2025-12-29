@@ -1,18 +1,12 @@
 {
     "version": 2,
-    "builds": [
+    "buildCommand": "npm --prefix client ci && npm --prefix client run build",
+    "outputDirectory": "client/build",
+    "installCommand": "npm install",
+    "rewrites": [
         {
-            "src": "client/package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "client/build"
-            }
-        }
-    ],
-    "routes": [
-        {
-            "src": "/(book|blog|read|category|search|authors|author|admin|login)(/.*)?",
-            "dest": "/index.html"
+            "source": "/(book|blog|read|category|search|authors|author|admin|login)(/.*)?",
+            "destination": "/index.html"
         }
     ]
 }
