@@ -1,3 +1,6 @@
+/index / 301!
+/*.html /:splat 301!
+/*/index /:splat 301!
 /book/* /index.html 200
 /blog/* /index.html 200
 /read/* /index.html 200
