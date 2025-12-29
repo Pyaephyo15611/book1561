@@ -8,21 +8,17 @@ export default {
     const isStaticAsset = staticAssetExtensions.some(ext => pathname.endsWith(ext))
     
     if (isStaticAsset) {
-      // Try to fetch the static asset
-      try {
-        return env.ASSETS.fetch(request)
-      } catch (error) {
-        // If asset not found, return 404
-        return new Response('Asset not found', { status: 404 })
-      }
+      // Try to fetch the static asset from the assets
+      const assetRequest = new Request(url.pathname, request)
+      return fetch(assetRequest)
     }
     
     // For all other routes (including root), serve index.html
     // This allows React Router to handle client-side routing
-    try {
-      return env.ASSETS.fetch(new Request('/index.html', request))
-    } catch (error) {
-      return new Response('App not found', { status: 404 })
-    }
+    const indexRequest = new Request('/index.html', {
+      headers: request.headers,
+      method: request.method
+    })
+    return fetch(indexRequest)
   }
 }
