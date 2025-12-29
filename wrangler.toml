@@ -7,4 +7,4 @@ compatibility_date = "2025-12-29"
 bucket = "./dist"
 
 [build]
-command = "cd client && npm run build && rm -rf ../dist && mv dist ../dist"
+command = "cd client && npm run build && mv build dist"
