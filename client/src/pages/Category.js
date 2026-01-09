@@ -11,6 +11,7 @@ const Category = () => {
   const { name } = useParams();
   const navigate = useNavigate();
   const [books, setBooks] = useState([]);
+  const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('recent');
   const [view, setView] = useState('grid');
@@ -30,6 +31,19 @@ const Category = () => {
     fetchBooks();
   }, []);
 
+  useEffect(() => {
+    const fetchSections = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/sections`);
+        setSections(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error('Error fetching sections:', error);
+        setSections([]);
+      }
+    };
+    fetchSections();
+  }, []);
+
   const normalizeCategory = (value) => {
     return decodeURIComponent(value || '')
       .trim()
@@ -43,6 +57,12 @@ const Category = () => {
     const routeCategory = normalizeCategory(routeCategoryRaw);
 
     if (!bookCategory || !routeCategory) return false;
+
+    // For this specific category, do not use fuzzy matching because it overlaps heavily
+    // with other comic-related categories (e.g. 'ရုပ်ပြ'). Only show explicitly assigned books.
+    if (routeCategory === normalizeCategory('ကာတွန်းနှင့်ရုပ်ပြများ')) {
+      return bookCategory === routeCategory;
+    }
 
     return (
       bookCategory === routeCategory ||
@@ -74,6 +94,10 @@ const Category = () => {
       }
     });
 
+  const routeKey = decodeURIComponent(name || '');
+  const matchedSection = sections.find((s) => normalizeCategory(s?.route) === normalizeCategory(routeKey));
+  const displayCategoryName = matchedSection?.title || routeKey;
+
   return (
     <div className="home-page category-page">
       <main className="main-content">
@@ -86,7 +110,7 @@ const Category = () => {
                 </button>
                 <div>
                   <span className="section-eyebrow">Category</span>
-                  <h2 className="section-title">{decodeURIComponent(name || '')}</h2>
+                  <h2 className="section-title">{displayCategoryName}</h2>
                 </div>
               </div>
               <div className="cat-actions">

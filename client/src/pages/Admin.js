@@ -12,6 +12,7 @@ const Admin = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   // Sections management state (currently not rendered in UI)
   // Keeping state minimal to avoid unused variables during build
+  const [sections, setSections] = useState([]);
     
   const [formData, setFormData] = useState({
     title: '',
@@ -48,8 +49,23 @@ const Admin = () => {
   React.useEffect(() => {
     if (isAuthenticated) {
       fetchBooks();
+      fetchSections();
     }
   }, [isAuthenticated]);
+
+  const fetchSections = async () => {
+    try {
+      const response = await fetch(`${API_URL || ''}/api/sections`, { headers: { 'Accept': 'application/json' } });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const ct = (response.headers.get('content-type') || '').toLowerCase();
+      if (!ct.includes('application/json')) throw new Error('Unexpected response type');
+      const data = await response.json();
+      setSections(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching sections:', err);
+      setSections([]);
+    }
+  };
 
   const fetchBooks = async () => {
     setListLoading(true);
@@ -435,18 +451,32 @@ const Admin = () => {
                 className={`form-input ${fieldErrors.category ? 'error' : ''}`}
                 required
               >
-                <option value="">Select a category...</option>
-                <optgroup label="Home Page Sections (Burmese)">
-                  <option value="ရသစာပေ">ရသစာပေများ</option>
-                  <option value="အောင်မြင်ရေး">အောင်မြင်ရေးစာပေများ</option>
-                  <option value="ရုပ်ပြ">ရုပ်ပြစာအုပ်များ</option>
-                  <option value="ဝတ္ထုတို">ဝတ္ထုတိုများ</option>
-                  <option value="သုတ">သုတစာပေများ</option>
-                  <option value="ကဗျာ">ကဗျာစာအုပ်များ</option>
-                  <option value="ဘာသာပြန်">ဘာသာပြန်စာအုပ်များ</option>
-                  <option value="ဘာ���ာရေး">ဘာသာရေးစာအုပ်များ</option>
+                <option value="">အမျိုးအစားရွေးပါ...</option>
+                <optgroup label="ပင်မစာမျက်နှာ အပိုင်းများ">
+                  {sections && sections.length > 0 ? (
+                    sections
+                      .filter((s) => s && s.route)
+                      .map((s) => (
+                        <option key={s.id || s.route} value={s.route}>
+                          {s.title || s.route}
+                        </option>
+                      ))
+                  ) : (
+                    <>
+                      <option value="ရသစာပေ">တာရာပွကြီး</option>
+                      <option value="အောင်မြင်ရေး">အောင်မြင်ရေးစာပေများ</option>
+                      <option value="ရုပ်ပြ">မြိုင်ရာဇာ တွတ်ပီ </option>
+                      <option value="ဝတ္ထုတို">ဘိုဘို</option>
+                      <option value="ကိုတင့် ကိုရွှေထူး">ကိုတင့် ကိုရွှေထူး</option>
+                      <option value="ကာတွန်းနှင့်ရုပ်ပြများ">ကာတွန်းနှင့်ရုပ်ပြများ</option>
+                      <option value="သုတ">သုတစာပေများ</option>
+                      <option value="ကဗျာ">ကဗျာစာအုပ်များ</option>
+                      <option value="ဘာသာပြန်">ဘာသာပြန်စာအုပ်များ</option>
+                      <option value="ဘာသာရေး">ဘာသာရေးစာပေများ</option>
+                    </>
+                  )}
                 </optgroup>
-                <optgroup label="Other Categories (English)">
+                <optgroup label="အခြားအမျိုးအစားများ (အင်္ဂလိပ်)">
                   <option value="fiction">Fiction</option>
                   <option value="literature">Literature</option>
                   <option value="romance">Romance</option>

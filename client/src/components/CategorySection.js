@@ -40,7 +40,7 @@ const CategorySection = ({ title, books, categoryRoute, loading, isNewSection = 
               className="trending-view"
               onClick={() => navigate(`/category/${encodeURIComponent(categoryRoute)}`)}
             >
-              (view all)
+              (အားလုံးကြည့်မယ်)
             </button>
           </div>
         </div>

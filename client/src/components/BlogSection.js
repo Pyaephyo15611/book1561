@@ -43,7 +43,7 @@ const BlogSection = ({ blogs = [] }) => {
     <section className="blog-section">
       <div className="container">
         <div className="blog-section-header">
-          <h2 className="blog-section-title">Latest News & Articles</h2>
+          <h2 className="blog-section-title">နောက်ဆုံးရ သတင်းများနှင့် ဆောင်းပါးများ</h2>
         </div>
         {blogs && blogs.length > 0 ? (
           <div className="blog-scroll-container">
@@ -84,7 +84,7 @@ const BlogSection = ({ blogs = [] }) => {
           </div>
         ) : (
           <div className="blog-empty-state">
-            <p>No blog posts yet. Check back soon for updates!</p>
+            <p>ဆောင်းပါးများ မရှိသေးပါ။ မကြာမီ အပ်ဒိတ်များအတွက် ပြန်လည်ကြည့်ရှုပါ။</p>
           </div>
         )}
       </div>

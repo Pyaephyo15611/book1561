@@ -236,9 +236,20 @@ const Home = () => {
   const displayBooks = filteredBooks.length > 0 ? filteredBooks : books;
 
   // Category mapping function to match books to categories
+  const normalizeCategory = (value) => {
+    return String(value || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  };
+
   const matchBookToCategory = (book, categoryKeywords) => {
     const bookCategory = (book.category || '').toLowerCase();
     return categoryKeywords.some(keyword => bookCategory.includes(keyword.toLowerCase()));
+  };
+
+  const matchBookToExactCategoryRoute = (book, categoryRoute) => {
+    return normalizeCategory(book?.category) === normalizeCategory(categoryRoute);
   };
 
   
@@ -359,19 +370,19 @@ const Home = () => {
           <div className="container">
             <div className="trending-header">
               <div className="trending-title">
-                <span>NEWS BOOKS</span>
+                <span>စာအုပ်အသစ်များ</span>
                 <button
                   type="button"
                   className="trending-view"
                   onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
                 >
-                  (view all)
+                  (အားလုံးကြည့်မယ်)
                 </button>
               </div>
               <div className="trending-nav">
-                <button 
-                  className="trend-arrow" 
-                  type="button" 
+                <button
+                  className="trend-arrow"
+                  type="button"
                   aria-label="Scroll left"
                   onClick={() => {
                     if (newsBooksScrollRef.current) {
@@ -381,18 +392,18 @@ const Home = () => {
                 >
                   ‹
                 </button>
-                  <button
-                  className="trend-arrow" 
-                    type="button"
+                <button
+                  className="trend-arrow"
+                  type="button"
                   aria-label="Scroll right"
                   onClick={() => {
                     if (newsBooksScrollRef.current) {
                       newsBooksScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
                     }
                   }}
-                  >
+                >
                   ›
-                  </button>
+                </button>
               </div>
             </div>
 
@@ -456,9 +467,12 @@ const Home = () => {
         {/* Category Sections - Show filtered results when searching */}
         <>
           {categorySections.map((category) => {
-            const categoryBooks = displayBooks.filter(book => 
-              matchBookToCategory(book, category.keywords)
-            );
+            const categoryBooks = displayBooks.filter((book) => {
+              if (category?.route === 'ကာတွန်းနှင့်ရုပ်ပြများ') {
+                return matchBookToExactCategoryRoute(book, category.route);
+              }
+              return matchBookToCategory(book, category.keywords);
+            });
             
             // Hide empty sections. Keep visible during loading so skeletons can render.
             if (loading || categoryBooks.length > 0) {
