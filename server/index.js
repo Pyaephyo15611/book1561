@@ -1475,6 +1475,7 @@ app.get('/api/books/:id/download', async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, immutable');
   
   try {
     const books = await getBooks();
@@ -1710,6 +1711,7 @@ app.get('/api/books/:id/pdf/part/:partNumber', async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, immutable');
   
   try {
     const books = await getBooks();
@@ -1840,6 +1842,8 @@ app.get('/api/books/:id/pdf', async (req, res) => {
       console.error('B2 credentials not configured');
       return res.status(500).json({ error: 'Backblaze B2 is not configured' });
     }
+
+    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, immutable');
 
     console.log('Generating signed URL for PDF:', fileName);
     
