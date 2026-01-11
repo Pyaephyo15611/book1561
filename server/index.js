@@ -1886,6 +1886,7 @@ app.get('/api/books/:id/pdf', async (req, res) => {
 
       // Set headers
       res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, immutable');
       if (b2Response.headers['content-length']) {
         res.setHeader('Content-Length', b2Response.headers['content-length']);
       }
@@ -1950,6 +1951,7 @@ app.get('/api/books/:id/pdf', async (req, res) => {
         if (!res.headersSent) {
           res.status(b2Resp.status);
           if (b2Resp.headers['content-type']) res.setHeader('Content-Type', b2Resp.headers['content-type']);
+          res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400, immutable');
           if (b2Resp.headers['content-length']) res.setHeader('Content-Length', b2Resp.headers['content-length']);
           if (b2Resp.headers['content-range']) res.setHeader('Content-Range', b2Resp.headers['content-range']);
           if (b2Resp.headers['accept-ranges']) res.setHeader('Accept-Ranges', b2Resp.headers['accept-ranges']);
