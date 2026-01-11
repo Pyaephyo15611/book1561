@@ -5,9 +5,9 @@
 // In development, CRA proxy will forward /api to http://localhost:5000
 // Use relative URLs to avoid hardcoded ports. For production, set REACT_APP_API_URL.
 const baseUrlEnv = process.env.REACT_APP_API_URL;
-const API_URL = baseUrlEnv && baseUrlEnv.trim()
+const API_URL = (baseUrlEnv && baseUrlEnv.trim())
   ? baseUrlEnv.trim().replace(/\/$/, '')
-  : '';
+  : (process.env.NODE_ENV === 'production' ? 'https://api.digitalcomic.site' : '');
 
 console.log('🔌 API Config - Using API URL:', API_URL || '(relative)');
 
