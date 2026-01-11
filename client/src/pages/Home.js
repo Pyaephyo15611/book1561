@@ -91,25 +91,38 @@ const Home = () => {
       // Try API first with no timeout limit
       try {
         console.log('Fetching books from API...');
-        const response = await axios.get(`${API_URL}/api/books`);
-        booksData = response.data;
+        const response = await axios.get(`${API_URL}/api/books`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        booksData = Array.isArray(response.data) ? response.data : [];
         console.log('API fetch successful, got', booksData.length, 'books');
       } catch (apiError) {
-        console.log('API not available, trying Firestore fallback:', apiError.message);
-        
-        // Always try Firestore fallback when API fails
+        console.log('API not available, trying Render fallback:', apiError.message);
+
+        // Fallback to Render origin if custom domain is temporarily unstable
         try {
-          console.log('Fetching books from Firestore...');
-          const snapshot = await getDocs(collection(db, 'books'));
-          snapshot.forEach((doc) => {
-            booksData.push({
-              id: doc.id,
-              ...doc.data()
-            });
+          const response2 = await axios.get('https://minibook-z3t6.onrender.com/api/books', {
+            headers: { 'Accept': 'application/json' }
           });
-          console.log('Firestore fetch successful, got', booksData.length, 'books');
-        } catch (fsErr) {
-          console.error('Firestore fallback failed:', fsErr.message);
+          booksData = Array.isArray(response2.data) ? response2.data : [];
+          console.log('Render fallback successful, got', booksData.length, 'books');
+        } catch (renderError) {
+          console.log('Render fallback failed, trying Firestore fallback:', renderError.message);
+
+          // Always try Firestore fallback when API fails
+          try {
+            console.log('Fetching books from Firestore...');
+            const snapshot = await getDocs(collection(db, 'books'));
+            snapshot.forEach((doc) => {
+              booksData.push({
+                id: doc.id,
+                ...doc.data()
+              });
+            });
+            console.log('Firestore fetch successful, got', booksData.length, 'books');
+          } catch (fsErr) {
+            console.error('Firestore fallback failed:', fsErr.message);
+          }
         }
       }
 
