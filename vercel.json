@@ -5,7 +5,7 @@
     "installCommand": "npm install",
     "rewrites": [
         {
-            "source": "/(book|blog|read|category|search|authors|author|admin|login)(/.*)?",
+            "source": "/(.*)",
             "destination": "/index.html"
         }
     ]
