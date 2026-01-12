@@ -199,8 +199,21 @@ const Home = () => {
   useEffect(() => {
     const fetchSections = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/sections`);
-        const data = response.data;
+        let data = [];
+
+        try {
+          const response = await axios.get(`${API_URL}/api/sections`, {
+            params: { _ts: Date.now() }
+          });
+          data = response.data;
+        } catch (apiError) {
+          // Fallback to Render origin if custom domain is temporarily unstable
+          const response2 = await axios.get('https://minibook-z3t6.onrender.com/api/sections', {
+            params: { _ts: Date.now() }
+          });
+          data = response2.data;
+        }
+
         if (Array.isArray(data) && data.length > 0) {
           const normalized = data
             .filter((s) => s && s.title && s.route)
@@ -221,7 +234,9 @@ const Home = () => {
           }
         }
       } catch (e) {
-        setCategorySections(defaultCategorySections);
+        // Don't wipe out a previously loaded sections list (that causes "shows then disappears").
+        // Only fall back to defaults if we don't have any sections yet.
+        setCategorySections((prev) => (Array.isArray(prev) && prev.length > 0 ? prev : defaultCategorySections));
       }
     };
     fetchSections();

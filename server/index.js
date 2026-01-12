@@ -441,6 +441,53 @@ async function uploadBooksJsonToB2(booksData) {
   }
 }
 
+// Helper function to upload sections.json to Backblaze B2
+async function uploadSectionsJsonToB2(sectionsData) {
+  if (!hasB2Credentials) {
+    console.error('❌ B2 credentials not configured - cannot upload sections.json');
+    return false;
+  }
+
+  try {
+    await ensureB2Authorized();
+    const jsonString = JSON.stringify(sectionsData, null, 2);
+    const jsonBuffer = Buffer.from(jsonString, 'utf8');
+    const fileName = 'data/sections.json';
+
+    console.log(`📤 Attempting to upload sections.json (${sectionsData.length} sections) to Backblaze...`);
+
+    const uploadUrlResponse = await b2.getUploadUrl({
+      bucketId: process.env.B2_BUCKET_ID
+    });
+
+    if (!uploadUrlResponse || !uploadUrlResponse.data) {
+      throw new Error('Failed to get upload URL from Backblaze B2');
+    }
+
+    const uploadResponse = await b2.uploadFile({
+      uploadUrl: uploadUrlResponse.data.uploadUrl,
+      uploadAuthToken: uploadUrlResponse.data.authorizationToken,
+      fileName: fileName,
+      data: jsonBuffer,
+      mime: 'application/json'
+    });
+
+    if (!uploadResponse || !uploadResponse.data) {
+      throw new Error('Upload response was empty');
+    }
+
+    console.log(`✅ Successfully uploaded sections.json to Backblaze: ${fileName} (${sectionsData.length} sections)`);
+    return true;
+  } catch (error) {
+    console.error('❌ FAILED to upload sections.json to Backblaze:', error.message);
+    console.error('   Error details:', error);
+    if (error.stack) {
+      console.error('   Stack:', error.stack);
+    }
+    return false;
+  }
+}
+
 // Helper function to download books.json from Backblaze B2
 async function downloadBooksJsonFromB2() {
   if (!hasB2Credentials) {
@@ -489,6 +536,56 @@ async function downloadBooksJsonFromB2() {
       return null;
     }
     console.warn('⚠️  Failed to download books.json from Backblaze:', error.message);
+    return null;
+  }
+}
+
+// Helper function to download sections.json from Backblaze B2
+async function downloadSectionsJsonFromB2() {
+  if (!hasB2Credentials) {
+    return null;
+  }
+
+  try {
+    await ensureB2Authorized();
+    const fileName = 'data/sections.json';
+
+    const listResponse = await b2.listFileNames({
+      bucketId: process.env.B2_BUCKET_ID,
+      startFileName: fileName,
+      maxFileCount: 10
+    });
+
+    const fileInfo = listResponse?.data?.files?.find((file) => file.fileName === fileName);
+
+    if (!fileInfo || !fileInfo.fileId) {
+      return null;
+    }
+
+    const downloadResponse = await b2.downloadFileById({
+      fileId: fileInfo.fileId
+    });
+
+    if (!downloadResponse || !downloadResponse.data) {
+      return null;
+    }
+
+    const jsonString = Buffer.isBuffer(downloadResponse.data)
+      ? downloadResponse.data.toString('utf8')
+      : downloadResponse.data;
+    const sections = JSON.parse(jsonString);
+
+    if (!Array.isArray(sections)) {
+      return null;
+    }
+
+    console.log(`✅ Downloaded ${sections.length} sections from Backblaze`);
+    return sections;
+  } catch (error) {
+    if (error.message && (error.message.includes('not found') || error.message.includes('No such file'))) {
+      return null;
+    }
+    console.warn('⚠️  Failed to download sections.json from Backblaze:', error.message);
     return null;
   }
 }
@@ -684,6 +781,14 @@ async function saveBlogs(blogs) {
 }
 
 async function getSections() {
+  if (hasB2Credentials) {
+    const b2Sections = await downloadSectionsJsonFromB2();
+    if (Array.isArray(b2Sections)) {
+      console.log(`✅ Loaded ${b2Sections.length} sections from Backblaze data/sections.json`);
+      return b2Sections;
+    }
+  }
+
   try {
     const data = await fs.readFile(SECTIONS_FILE, 'utf8');
     const parsed = JSON.parse(data);
@@ -697,6 +802,10 @@ async function getSections() {
 async function saveSections(sections) {
   try {
     await fs.writeFile(SECTIONS_FILE, JSON.stringify(sections, null, 2));
+
+    if (hasB2Credentials) {
+      await uploadSectionsJsonToB2(sections);
+    }
   } catch (error) {
     console.error('Error saving sections:', error);
     throw error;
