@@ -51,7 +51,9 @@ const Navbar = ({ user }) => {
     let didCancel = false;
     const fetchBooks = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/books`);
+        const response = await axios.get(`${API_URL}/api/books`, {
+          params: { _ts: Date.now() }
+        });
         if (!didCancel) {
           setBooks(Array.isArray(response.data) ? response.data : []);
         }
@@ -61,8 +63,14 @@ const Navbar = ({ user }) => {
     };
 
     fetchBooks();
+
+    const handleFocus = () => {
+      fetchBooks();
+    };
+    window.addEventListener('focus', handleFocus);
     return () => {
       didCancel = true;
+      window.removeEventListener('focus', handleFocus);
     };
   }, []);
 

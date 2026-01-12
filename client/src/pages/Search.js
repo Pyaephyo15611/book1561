@@ -16,7 +16,9 @@ const Search = () => {
   useEffect(() => {
     const fetchBooks = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/books`);
+        const response = await axios.get(`${API_URL}/api/books`, {
+          params: { _ts: Date.now() }
+        });
         setBooks(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error('Error fetching books:', error);
@@ -25,7 +27,7 @@ const Search = () => {
       }
     };
     fetchBooks();
-  }, []);
+  }, [term, location.search]);
 
   const query = decodeURIComponent(term || '').toLowerCase();
   const searchParams = new URLSearchParams(location.search);

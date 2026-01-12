@@ -55,7 +55,8 @@ const Admin = () => {
 
   const fetchSections = async () => {
     try {
-      const response = await fetch(`${API_URL || ''}/api/sections`, { headers: { 'Accept': 'application/json' } });
+      const ts = Date.now();
+      const response = await fetch(`${API_URL || ''}/api/sections?_ts=${ts}`, { headers: { 'Accept': 'application/json' } });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const ct = (response.headers.get('content-type') || '').toLowerCase();
       if (!ct.includes('application/json')) throw new Error('Unexpected response type');

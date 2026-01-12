@@ -205,9 +205,16 @@ const Home = () => {
           const normalized = data
             .filter((s) => s && s.title && s.route)
             .map((s) => ({
-              title: s.title,
-              route: s.route,
-              keywords: Array.isArray(s.keywords) ? s.keywords : []
+              title: String(s.title || '').trim(),
+              route: String(s.route || '').trim(),
+              keywords: Array.isArray(s.keywords)
+                ? s.keywords
+                : typeof s.keywords === 'string'
+                  ? s.keywords
+                      .split(',')
+                      .map((k) => k.trim())
+                      .filter(Boolean)
+                  : []
             }));
           if (normalized.length > 0) {
             setCategorySections(normalized);
@@ -438,7 +445,10 @@ const Home = () => {
             const categoryBooks = displayBooks.filter((book) => {
               // Always allow explicit category assignment to the section route.
               // This makes newly-created admin sections work even when keywords are empty.
-              if (matchBookToExactCategoryRoute(book, category?.route)) {
+              if (
+                matchBookToExactCategoryRoute(book, category?.route) ||
+                matchBookToExactCategoryRoute(book, category?.title)
+              ) {
                 return true;
               }
 
@@ -450,19 +460,21 @@ const Home = () => {
               return matchBookToCategory(book, category.keywords);
             });
             
-            // Hide empty sections. Keep visible during loading so skeletons can render.
-            if (loading || categoryBooks.length > 0) {
-              return (
-                <CategorySection
-                  key={category.title}
-                  title={category.title}
-                  books={categoryBooks}
-                  categoryRoute={category.route}
-                  loading={loading}
-                />
-              );
+            // Hide empty sections after loading.
+            // Keep visible during loading so skeletons can render.
+            if (!loading && categoryBooks.length === 0) {
+              return null;
             }
-            return null;
+
+            return (
+              <CategorySection
+                key={category.route || category.title}
+                title={category.title}
+                books={categoryBooks}
+                categoryRoute={category.route}
+                loading={loading}
+              />
+            );
           })}
         </>
 

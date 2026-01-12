@@ -736,7 +736,7 @@ function verifyAdminPassword(req, res, next) {
 
 app.get('/api/sections', async (req, res) => {
   try {
-    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     const sections = await getSections();
     res.json(sections);
   } catch (error) {
@@ -824,7 +824,7 @@ app.delete('/api/admin/sections/:id', verifyAdminPassword, async (req, res) => {
 // Get all books
 app.get('/api/books', async (req, res) => {
   try {
-    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     const books = await getBooks();
     
