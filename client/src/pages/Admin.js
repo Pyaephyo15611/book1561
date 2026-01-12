@@ -24,6 +24,10 @@ const Admin = () => {
     rating: '',
     pdf: null,
     pdfParts: [], // Array of { partNumber, file }
+    autoSplit: false,
+    pagesPerPart: '20',
+    firstPartPages: '10',
+    partsCount: '4',
     isTrending: false
   });
   const [books, setBooks] = useState([]);
@@ -117,6 +121,10 @@ const Admin = () => {
       rating: book.rating || '',
       pdf: null,
       pdfParts: book.pdfParts ? book.pdfParts.map((p, i) => ({ partNumber: p.partNumber || i + 1, file: null })) : [],
+      autoSplit: false,
+      pagesPerPart: '20',
+      firstPartPages: '10',
+      partsCount: '4',
       isTrending: !!book.isTrending
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -204,12 +212,34 @@ const Admin = () => {
     const isComic = formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic';
     const hasParts = isComic && formData.pdfParts.length > 0 && formData.pdfParts.some(p => p.file);
     const hasSinglePdf = formData.pdf;
+    const useAutoSplit = !!formData.autoSplit;
     
     if (!hasSinglePdf && !hasParts && !editingId) {
       errors.pdf = isComic ? 'Upload PDF parts or a single PDF file' : 'PDF file is required';
     }
     if (isComic && hasParts && hasSinglePdf) {
       errors.pdf = 'Use either PDF parts OR a single PDF file, not both';
+    }
+
+    if (useAutoSplit && hasParts) {
+      errors.pdf = 'Auto-split requires a single PDF file (do not upload parts)';
+    }
+
+    if (useAutoSplit && !hasSinglePdf && !editingId) {
+      errors.pdf = 'Auto-split requires a single PDF file';
+    }
+
+    if (useAutoSplit) {
+      const ppp = parseInt(formData.pagesPerPart, 10);
+      const pc = parseInt(formData.partsCount, 10);
+      if (!(Number.isFinite(ppp) && ppp > 0) && !(Number.isFinite(pc) && pc > 0)) {
+        errors.pagesPerPart = 'Enter pages per part or parts count';
+      }
+
+      const fpp = parseInt(formData.firstPartPages, 10);
+      if (formData.firstPartPages && !(Number.isFinite(fpp) && fpp > 0)) {
+        errors.firstPartPages = 'First part pages must be a positive number';
+      }
     }
     
     return errors;
@@ -264,6 +294,13 @@ const Admin = () => {
       formDataToSend.append('rating', formData.rating);
       formDataToSend.append('isTrending', formData.isTrending);
 
+      if (formData.autoSplit) {
+        formDataToSend.append('autoSplit', 'true');
+        if (formData.pagesPerPart) formDataToSend.append('pagesPerPart', String(formData.pagesPerPart));
+        if (formData.firstPartPages) formDataToSend.append('firstPartPages', String(formData.firstPartPages));
+        if (formData.partsCount) formDataToSend.append('partsCount', String(formData.partsCount));
+      }
+
       const url = editingId ? `${API_URL || ''}/api/admin/books/${editingId}` : `${API_URL || ''}/api/admin/books`;
       const method = editingId ? 'PUT' : 'POST';
 
@@ -300,6 +337,10 @@ const Admin = () => {
         rating: '',
         pdf: null,
         pdfParts: [],
+        autoSplit: false,
+        pagesPerPart: '20',
+        firstPartPages: '10',
+        partsCount: '4',
         isTrending: false
       });
       setEditingId(null);
@@ -585,11 +626,85 @@ const Admin = () => {
               </small>
             </div>
 
+            {(formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic') && (
+              <div className="form-group full-width">
+                <label>Auto Split (recommended for faster loading)</label>
+                <div className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    id="autoSplit"
+                    name="autoSplit"
+                    checked={!!formData.autoSplit}
+                    onChange={(e) => setFormData(prev => ({ ...prev, autoSplit: e.target.checked }))}
+                  />
+                  <span>Split the uploaded PDF into smaller parts automatically</span>
+                </div>
+
+                {formData.autoSplit && (
+                  <div style={{ marginTop: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label htmlFor="pagesPerPart">Pages per part</label>
+                      <input
+                        type="number"
+                        id="pagesPerPart"
+                        name="pagesPerPart"
+                        value={formData.pagesPerPart}
+                        onChange={handleInputChange}
+                        className={`form-input ${fieldErrors.pagesPerPart ? 'error' : ''}`}
+                        min="1"
+                        placeholder="e.g. 20"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="firstPartPages">First part pages (optional)</label>
+                      <input
+                        type="number"
+                        id="firstPartPages"
+                        name="firstPartPages"
+                        value={formData.firstPartPages}
+                        onChange={handleInputChange}
+                        className={`form-input ${fieldErrors.firstPartPages ? 'error' : ''}`}
+                        min="1"
+                        placeholder="e.g. 8"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="partsCount">OR parts count</label>
+                      <input
+                        type="number"
+                        id="partsCount"
+                        name="partsCount"
+                        value={formData.partsCount}
+                        onChange={handleInputChange}
+                        className="form-input"
+                        min="1"
+                        placeholder="e.g. 4"
+                      />
+                    </div>
+                    {fieldErrors.pagesPerPart && (
+                      <small className="field-error" style={{ gridColumn: '1 / -1' }}>{fieldErrors.pagesPerPart}</small>
+                    )}
+                    {fieldErrors.firstPartPages && (
+                      <small className="field-error" style={{ gridColumn: '1 / -1' }}>{fieldErrors.firstPartPages}</small>
+                    )}
+                    <small className="form-hint" style={{ gridColumn: '1 / -1' }}>
+                      Tip: Set pages-per-part to control how many pages each part has. Smaller parts load faster.
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* PDF Parts Upload for Comics */}
             {(formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic') && (
               <div className="form-group full-width">
                 <label>PDF Parts (for Comics/Manga) *</label>
                 <div className="pdf-parts-upload">
+                  {formData.autoSplit && (
+                    <div className="error-message" style={{ marginBottom: '10px' }}>
+                      Auto-split is enabled. Please upload only a single PDF above (do not upload parts).
+                    </div>
+                  )}
                   <div className="parts-list">
                     {formData.pdfParts.map((part, index) => (
                       <div key={index} className="part-item">
@@ -604,6 +719,7 @@ const Admin = () => {
                             newParts.forEach((p, i) => { p.partNumber = i + 1; });
                             setFormData(prev => ({ ...prev, pdfParts: newParts }));
                           }}
+                          disabled={!!formData.autoSplit}
                         >
                           Remove
                         </button>
@@ -620,6 +736,7 @@ const Admin = () => {
                         pdfParts: [...prev.pdfParts, { partNumber, file: null }]
                       }));
                     }}
+                    disabled={!!formData.autoSplit}
                   >
                     + Add Part {formData.pdfParts.length + 1}
                   </button>
@@ -641,6 +758,7 @@ const Admin = () => {
                           }
                         }}
                         className="file-input"
+                        disabled={!!formData.autoSplit}
                       />
                     </div>
                   ))}

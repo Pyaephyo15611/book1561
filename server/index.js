@@ -8,6 +8,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const axios = require('axios');
 const archiver = require('archiver');
+const { PDFDocument } = require('pdf-lib');
 
 dotenv.config();
 
@@ -980,7 +981,7 @@ app.post(
       console.log('🔍 DEBUG: Request body:', req.body);
       console.log('🔍 DEBUG: Request files:', req.files ? Object.keys(req.files) : 'No files');
       
-      const { title, author, description, category, readingTime, rating, isTrending, hasParts, partsCount } = req.body;
+      const { title, author, description, category, readingTime, rating, isTrending, hasParts, partsCount, autoSplit, pagesPerPart, firstPartPages } = req.body;
 
       console.log('🔍 DEBUG: Extracted fields:', { title, author, description, category, readingTime, rating, isTrending, hasParts, partsCount });
 
@@ -1000,7 +1001,70 @@ app.post(
       let b2PdfFileName = null;
 
       // Handle PDF parts (for comics)
-      if (hasParts === 'true' && partsCount) {
+      if (autoSplit === 'true' && req.files['pdf']?.[0]) {
+        if (!hasB2Credentials) {
+          throw new Error('Backblaze B2 not configured - cannot store PDF files');
+        }
+
+        const pdfFile = req.files['pdf'][0];
+        const sourcePdf = await PDFDocument.load(pdfFile.buffer);
+        const totalPages = sourcePdf.getPageCount();
+
+        const rawPagesPerPart = parseInt(pagesPerPart, 10);
+        const rawFirstPartPages = parseInt(firstPartPages, 10);
+        const rawPartsCount = partsCount ? parseInt(partsCount, 10) : NaN;
+
+        let pagesPerPartNum = Number.isFinite(rawPagesPerPart) && rawPagesPerPart > 0 ? rawPagesPerPart : null;
+        if (!pagesPerPartNum && Number.isFinite(rawPartsCount) && rawPartsCount > 0) {
+          pagesPerPartNum = Math.ceil(totalPages / rawPartsCount);
+        }
+
+        if (!pagesPerPartNum) {
+          throw new Error('pagesPerPart (or partsCount) is required when autoSplit is enabled');
+        }
+
+        const firstPartPagesNum = Number.isFinite(rawFirstPartPages) && rawFirstPartPages > 0
+          ? Math.min(rawFirstPartPages, pagesPerPartNum)
+          : null;
+
+        const maxParts = parseInt(process.env.AUTO_SPLIT_MAX_PARTS || '20', 10);
+        const computedParts = firstPartPagesNum
+          ? 1 + Math.ceil(Math.max(0, totalPages - firstPartPagesNum) / pagesPerPartNum)
+          : Math.ceil(totalPages / pagesPerPartNum);
+        if (computedParts > maxParts) {
+          throw new Error(`Auto-split would create ${computedParts} parts (max ${maxParts}). Increase pages per part.`);
+        }
+
+        pdfParts = [];
+        let partNumber = 1;
+        let start = 0;
+        while (start < totalPages) {
+          const partSize = (partNumber === 1 && firstPartPagesNum) ? firstPartPagesNum : pagesPerPartNum;
+          const endExclusive = Math.min(start + partSize, totalPages);
+          const partPdf = await PDFDocument.create();
+          const indices = [];
+          for (let i = start; i < endExclusive; i++) indices.push(i);
+          const copiedPages = await partPdf.copyPages(sourcePdf, indices);
+          for (const p of copiedPages) partPdf.addPage(p);
+          const partBytes = await partPdf.save();
+          const partBuffer = Buffer.from(partBytes);
+
+          const b2PartFileName = await uploadPdfToB2(
+            partBuffer,
+            `books/${bookId}/parts/part-${partNumber}.pdf`,
+            'application/pdf'
+          );
+
+          pdfParts.push({
+            partNumber,
+            b2FileName: b2PartFileName,
+            fileName: b2PartFileName
+          });
+
+          partNumber += 1;
+          start = endExclusive;
+        }
+      } else if (hasParts === 'true' && partsCount) {
         const partsCountNum = parseInt(partsCount);
         pdfParts = [];
         
