@@ -1619,91 +1619,6 @@ app.get('/api/books/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
 
-    // Handle books with multiple parts - create ZIP file
-    if (book.pdfParts && book.pdfParts.length > 0) {
-      console.log(`📦 Book has ${book.pdfParts.length} parts, creating ZIP file`);
-      const zipFileName = book.title ? `${book.title}.zip` : 'book.zip';
-      
-      res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(zipFileName)}"`);
-      
-      const archive = archiver('zip', { zlib: { level: 9 } });
-      archive.pipe(res);
-      
-      // Handle errors
-      archive.on('error', (err) => {
-        console.error('Archive error:', err);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'Failed to create ZIP file' });
-        }
-      });
-      
-      try {
-        if (hasB2Credentials) {
-          await ensureB2Authorized();
-        }
-        
-        // Download all parts and add to ZIP
-        for (const part of book.pdfParts.sort((a, b) => a.partNumber - b.partNumber)) {
-          let partData = null;
-          
-          // Fetch PDF part from Backblaze B2 only (no local storage)
-          if (!partData && part.b2FileName && hasB2Credentials) {
-            try {
-              const listResponse = await b2.listFileNames({
-                bucketId: process.env.B2_BUCKET_ID,
-                startFileName: part.b2FileName,
-                maxFileCount: 10000
-              });
-              
-              if (listResponse?.data?.files) {
-                const fileInfo = listResponse.data.files.find(f => 
-                  f.fileName === part.b2FileName || 
-                  f.fileName.includes(part.b2FileName) ||
-                  part.b2FileName.includes(f.fileName)
-                );
-                
-                if (fileInfo) {
-                  const downloadResponse = await b2.downloadFileById({
-                    fileId: fileInfo.fileId,
-                    responseType: 'arraybuffer'
-                  });
-                  
-                  if (downloadResponse?.data) {
-                    partData = Buffer.from(downloadResponse.data);
-                    console.log(`✅ Downloaded part ${part.partNumber} from B2`);
-                  } else if (Buffer.isBuffer(downloadResponse)) {
-                    partData = downloadResponse;
-                    console.log(`✅ Downloaded part ${part.partNumber} from B2 (direct buffer)`);
-                  }
-                }
-              }
-            } catch (b2Error) {
-              console.error(`Error downloading part ${part.partNumber} from B2:`, b2Error.message);
-            }
-          }
-          
-          if (partData) {
-            const partFileName = `Part_${part.partNumber}_${book.title || 'book'}.pdf`;
-            archive.append(partData, { name: partFileName });
-            console.log(`✅ Added part ${part.partNumber} to ZIP`);
-          } else {
-            console.warn(`⚠️  Part ${part.partNumber} not found, skipping`);
-          }
-        }
-        
-        await archive.finalize();
-        console.log('✅ ZIP file created and sent successfully');
-        return;
-      } catch (zipError) {
-        console.error('Error creating ZIP:', zipError);
-        if (!res.headersSent) {
-          return res.status(500).json({ error: 'Failed to create ZIP file', details: zipError.message });
-        }
-        return;
-      }
-    }
-
     const downloadFileName = book.title ? `${book.title}.pdf` : 'book.pdf';
     
     // Fetch PDF from Backblaze B2 only (no local storage)
@@ -1711,7 +1626,7 @@ app.get('/api/books/:id/download', async (req, res) => {
     
     if (!fileName) {
       console.error('No filename for book:', req.params.id);
-      return res.status(400).json({ error: 'Book file not found' });
+      return res.status(400).json({ error: 'Whole PDF not found. Please upload the full PDF in Admin (used for download).' });
     }
     
     if (!hasB2Credentials) {

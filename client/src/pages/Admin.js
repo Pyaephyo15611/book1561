@@ -31,6 +31,8 @@ const Admin = () => {
   const [listLoading, setListLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('books');
 
+  const MAX_PDF_PARTS = 10;
+
   const handleLogin = (e) => {
     e.preventDefault();
     if (adminPassword.trim()) {
@@ -335,16 +337,11 @@ const Admin = () => {
     if (!formData.title.trim()) errors.title = 'Title is required';
     if (!formData.author.trim()) errors.author = 'Author is required';
     if (!formData.category) errors.category = 'Category is required';
-    
-    const isComic = formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic';
-    const hasParts = isComic && formData.pdfParts.length > 0 && formData.pdfParts.some(p => p.file);
+
     const hasSinglePdf = formData.pdf;
-    
-    if (!hasSinglePdf && !hasParts && !editingId) {
-      errors.pdf = isComic ? 'Upload PDF parts or a single PDF file' : 'PDF file is required';
-    }
-    if (isComic && hasParts && hasSinglePdf) {
-      errors.pdf = 'Use either PDF parts OR a single PDF file, not both';
+
+    if (!hasSinglePdf && !editingId) {
+      errors.pdf = 'Upload the whole PDF file (required for download)';
     }
     
     return errors;
@@ -359,12 +356,7 @@ const Admin = () => {
       return;
     }
 
-    const isComic =
-      formData.category === 'ရုပ်ပြ' ||
-      formData.category === 'comic' ||
-      formData.category === 'graphic';
     const hasParts =
-      isComic &&
       formData.pdfParts.length > 0 &&
       formData.pdfParts.some((p) => p.file);
     
@@ -381,13 +373,14 @@ const Admin = () => {
       
       // Add PDF parts if provided (for comics)
       if (hasParts) {
-        formData.pdfParts.forEach((part, index) => {
-          if (part.file) {
+        formData.pdfParts
+          .filter((p) => p.file && p.partNumber <= MAX_PDF_PARTS)
+          .forEach((part) => {
             formDataToSend.append(`pdfPart${part.partNumber}`, part.file);
-          }
-        });
+          });
         formDataToSend.append('hasParts', 'true');
-        formDataToSend.append('partsCount', formData.pdfParts.filter(p => p.file).length.toString());
+        const count = formData.pdfParts.filter((p) => p.file && p.partNumber <= MAX_PDF_PARTS).length;
+        formDataToSend.append('partsCount', count.toString());
       }
       
       if (formData.coverFile) formDataToSend.append('coverImage', formData.coverFile);
@@ -704,7 +697,7 @@ const Admin = () => {
             </div>
 
             <div className="form-group full-width">
-              <label htmlFor="pdf">PDF File {!(formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic') ? '*' : ''}</label>
+              <label htmlFor="pdf">PDF File *</label>
               <div className="file-upload-wrapper">
                 <input
                   type="file"
@@ -713,60 +706,57 @@ const Admin = () => {
                   accept=".pdf"
                   onChange={handlePdfFileChange}
                   className={`file-input ${fieldErrors.pdf ? 'error' : ''}`}
-                  required={!editingId && !(formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic')}
+                  required={!editingId}
                 />
                 <label htmlFor="pdf" className="file-label">
                   <Upload size={20} />
-                  {formData.pdf ? formData.pdf.name : 'Choose PDF file (or use Parts below for comics)'}
+                  {formData.pdf ? formData.pdf.name : 'Choose PDF file (or use Parts below)'}
                 </label>
               </div>
               {fieldErrors.pdf && <small className="field-error">{fieldErrors.pdf}</small>}
               <small className="form-hint">
-                {formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic' 
-                  ? 'Upload a single PDF file, OR use the Parts section below for comics/manga with multiple parts.'
-                  : 'Upload the book PDF file. Required for all books.'}
+                Upload the whole PDF for download. If you also upload Parts below, Parts will be used for online reading.
               </small>
             </div>
 
-            {/* PDF Parts Upload for Comics */}
-            {(formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic') && (
-              <div className="form-group full-width">
-                <label>PDF Parts (for Comics/Manga) *</label>
-                <div className="pdf-parts-upload">
-                  <div className="parts-list">
-                    {formData.pdfParts.map((part, index) => (
-                      <div key={index} className="part-item">
-                        <span className="part-number">Part {part.partNumber}</span>
-                        <span className="part-file-name">{part.file ? part.file.name : 'No file'}</span>
-                        <button
-                          type="button"
-                          className="btn-remove-part"
-                          onClick={() => {
-                            const newParts = formData.pdfParts.filter((_, i) => i !== index);
-                            // Renumber parts
-                            newParts.forEach((p, i) => { p.partNumber = i + 1; });
-                            setFormData(prev => ({ ...prev, pdfParts: newParts }));
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-add-part"
-                    onClick={() => {
-                      const partNumber = formData.pdfParts.length + 1;
-                      setFormData(prev => ({
-                        ...prev,
-                        pdfParts: [...prev.pdfParts, { partNumber, file: null }]
-                      }));
-                    }}
-                  >
-                    + Add Part {formData.pdfParts.length + 1}
-                  </button>
-                  {formData.pdfParts.length > 0 && formData.pdfParts.map((part, index) => (
+            <div className="form-group full-width">
+              <label>PDF Parts (Online Reading)</label>
+              <div className="pdf-parts-upload">
+                <div className="parts-list">
+                  {formData.pdfParts.map((part, index) => (
+                    <div key={index} className="part-item">
+                      <span className="part-number">Part {part.partNumber}</span>
+                      <span className="part-file-name">{part.file ? part.file.name : 'No file'}</span>
+                      <button
+                        type="button"
+                        className="btn-remove-part"
+                        onClick={() => {
+                          const newParts = formData.pdfParts.filter((_, i) => i !== index);
+                          newParts.forEach((p, i) => { p.partNumber = i + 1; });
+                          setFormData(prev => ({ ...prev, pdfParts: newParts }));
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="btn-add-part"
+                  onClick={() => {
+                    if (formData.pdfParts.length >= MAX_PDF_PARTS) return;
+                    const partNumber = formData.pdfParts.length + 1;
+                    setFormData(prev => ({
+                      ...prev,
+                      pdfParts: [...prev.pdfParts, { partNumber, file: null }]
+                    }));
+                  }}
+                >
+                  + Add Part {formData.pdfParts.length + 1}
+                </button>
+                {formData.pdfParts.length > 0 &&
+                  formData.pdfParts.map((part, index) => (
                     <div key={index} className="part-file-input">
                       <label htmlFor={`partFile${index}`} className="part-file-label">
                         Part {part.partNumber} PDF:
@@ -787,12 +777,11 @@ const Admin = () => {
                       />
                     </div>
                   ))}
-                </div>
-                <small className="form-hint">
-                  Upload multiple PDF files as Part 1, Part 2, etc. Leave single PDF field empty if using parts.
-                </small>
               </div>
-            )}
+              <small className="form-hint">
+                Upload multiple PDF files as Part 1, Part 2, etc. (Max {MAX_PDF_PARTS} parts). Leave single PDF field empty if using parts.
+              </small>
+            </div>
           </div>
 
           <div className="form-actions">

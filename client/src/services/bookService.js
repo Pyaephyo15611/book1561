@@ -1,9 +1,8 @@
-import axios from 'axios';
-import { API_URL } from '../utils/apiConfig';
+import { apiGet } from '../utils/apiConfig';
 
 export const getBookById = async (id) => {
   try {
-    const response = await axios.get(`${API_URL}/api/books/${id}`);
+    const response = await apiGet(`/api/books/${id}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching book:', error);
@@ -13,7 +12,7 @@ export const getBookById = async (id) => {
 
 export const getAllBooks = async () => {
   try {
-    const response = await axios.get(`${API_URL}/api/books`);
+    const response = await apiGet('/api/books');
     return response.data;
   } catch (error) {
     console.error('Error fetching books:', error);

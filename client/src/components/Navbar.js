@@ -3,10 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { LogOut, Menu, Search as SearchIcon, X } from 'lucide-react';
-import axios from 'axios';
 import './Navbar.css';
 import logo from '../assets/logo3.png';
-import { API_URL } from '../utils/apiConfig';
+import { apiGet } from '../utils/apiConfig';
 
 const Navbar = ({ user }) => {
   const navigate = useNavigate();
@@ -51,7 +50,7 @@ const Navbar = ({ user }) => {
     let didCancel = false;
     const fetchBooks = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/books`, {
+        const response = await apiGet('/api/books', {
           params: { _ts: Date.now() }
         });
         if (!didCancel) {

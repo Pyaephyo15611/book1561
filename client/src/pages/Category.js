@@ -59,17 +59,7 @@ const Category = () => {
 
     if (!bookCategory || !routeCategory) return false;
 
-    // For this specific category, do not use fuzzy matching because it overlaps heavily
-    // with other comic-related categories (e.g. 'ရုပ်ပြ'). Only show explicitly assigned books.
-    if (routeCategory === normalizeCategory('ကာတွန်းနှင့်ရုပ်ပြများ')) {
-      return bookCategory === routeCategory;
-    }
-
-    return (
-      bookCategory === routeCategory ||
-      bookCategory.includes(routeCategory) ||
-      routeCategory.includes(bookCategory)
-    );
+    return bookCategory === routeCategory;
   };
 
   const filtered = books

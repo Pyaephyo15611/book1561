@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { collection, getDocs } from 'firebase/firestore/lite';
 import { db } from '../firebase/config';
-import axios from 'axios';
+import { API_URL, apiGet } from '../utils/apiConfig';
 import {
   BookOpen,
   Facebook,
@@ -15,7 +15,6 @@ import {
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import CategorySection from '../components/CategorySection';
 import BookSkeleton from '../components/BookSkeleton';
-import { API_URL } from '../utils/apiConfig';
 import './Home.css';
 import bannerLogo from '../assets/logo.png';
 
@@ -87,41 +86,29 @@ const Home = () => {
       lastFetchAtRef.current = Date.now();
       let booksData = [];
 
-      // Try API first with no timeout limit
       try {
         console.log('Fetching books from API...');
-        const response = await axios.get(`${API_URL}/api/books`, {
+        const response = await apiGet('/api/books', {
           headers: { 'Accept': 'application/json' }
         });
         booksData = Array.isArray(response.data) ? response.data : [];
         console.log('API fetch successful, got', booksData.length, 'books');
       } catch (apiError) {
-        console.log('API not available, trying Render fallback:', apiError.message);
+        console.log('API not available, trying Firestore fallback:', apiError.message);
 
-        // Fallback to Render origin if custom domain is temporarily unstable
+        // Always try Firestore fallback when API fails
         try {
-          const response2 = await axios.get('https://minibook-z3t6.onrender.com/api/books', {
-            headers: { 'Accept': 'application/json' }
-          });
-          booksData = Array.isArray(response2.data) ? response2.data : [];
-          console.log('Render fallback successful, got', booksData.length, 'books');
-        } catch (renderError) {
-          console.log('Render fallback failed, trying Firestore fallback:', renderError.message);
-
-          // Always try Firestore fallback when API fails
-          try {
-            console.log('Fetching books from Firestore...');
-            const snapshot = await getDocs(collection(db, 'books'));
-            snapshot.forEach((doc) => {
-              booksData.push({
-                id: doc.id,
-                ...doc.data()
-              });
+          console.log('Fetching books from Firestore...');
+          const snapshot = await getDocs(collection(db, 'books'));
+          snapshot.forEach((doc) => {
+            booksData.push({
+              id: doc.id,
+              ...doc.data()
             });
-            console.log('Firestore fetch successful, got', booksData.length, 'books');
-          } catch (fsErr) {
-            console.error('Firestore fallback failed:', fsErr.message);
-          }
+          });
+          console.log('Firestore fetch successful, got', booksData.length, 'books');
+        } catch (fsErr) {
+          console.error('Firestore fallback failed:', fsErr.message);
         }
       }
 
@@ -201,18 +188,10 @@ const Home = () => {
       try {
         let data = [];
 
-        try {
-          const response = await axios.get(`${API_URL}/api/sections`, {
-            params: { _ts: Date.now() }
-          });
-          data = response.data;
-        } catch (apiError) {
-          // Fallback to Render origin if custom domain is temporarily unstable
-          const response2 = await axios.get('https://minibook-z3t6.onrender.com/api/sections', {
-            params: { _ts: Date.now() }
-          });
-          data = response2.data;
-        }
+        const response = await apiGet('/api/sections', {
+          params: { _ts: Date.now() }
+        });
+        data = response.data;
 
         if (Array.isArray(data) && data.length > 0) {
           const normalized = data
@@ -252,11 +231,6 @@ const Home = () => {
       .trim()
       .replace(/\s+/g, ' ')
       .toLowerCase();
-  };
-
-  const matchBookToCategory = (book, categoryKeywords) => {
-    const bookCategory = (book.category || '').toLowerCase();
-    return categoryKeywords.some(keyword => bookCategory.includes(keyword.toLowerCase()));
   };
 
   const matchBookToExactCategoryRoute = (book, categoryRoute) => {
@@ -458,8 +432,6 @@ const Home = () => {
         <>
           {categorySections.map((category) => {
             const categoryBooks = displayBooks.filter((book) => {
-              // Always allow explicit category assignment to the section route.
-              // This makes newly-created admin sections work even when keywords are empty.
               if (
                 matchBookToExactCategoryRoute(book, category?.route) ||
                 matchBookToExactCategoryRoute(book, category?.title)
@@ -467,12 +439,7 @@ const Home = () => {
                 return true;
               }
 
-              // For this specific category, do not use fuzzy keyword matching because it overlaps heavily.
-              if (category?.route === 'ကာတွန်းနှင့်ရုပ်ပြများ') {
-                return false;
-              }
-
-              return matchBookToCategory(book, category.keywords);
+              return false;
             });
             
             // Hide empty sections after loading.

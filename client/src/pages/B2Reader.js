@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { ArrowLeft } from 'lucide-react';
-import axios from 'axios';
-import { API_URL } from '../utils/apiConfig';
+import { apiGet, RENDER_FALLBACK_BASE } from '../utils/apiConfig';
 import './BookDetail.css';
 import './B2Reader.css';
 
@@ -20,6 +19,8 @@ const B2Reader = () => {
   const [error, setError] = useState(null);
   const [bookTitle, setBookTitle] = useState('Loading...');
   const [pdfUrl, setPdfUrl] = useState('');
+  const [parts, setParts] = useState([]);
+  const [selectedPartNumber, setSelectedPartNumber] = useState(null);
   const [pageInput, setPageInput] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [containerWidth, setContainerWidth] = useState(window.innerWidth);
@@ -29,7 +30,7 @@ const B2Reader = () => {
   useEffect(() => {
     const fetchBookDetails = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/books/${id}`);
+        const response = await apiGet(`/api/books/${id}`);
         setBookTitle(response.data.title || 'Book Reader');
       } catch (err) {
         console.error('Error fetching book details:', err);
@@ -43,19 +44,44 @@ const B2Reader = () => {
   useEffect(() => {
     const fetchView = async () => {
       try {
-        const resp = await axios.get(`${API_URL}/api/books/${id}/view`);
-        if (resp.data && resp.data.viewUrl) {
+        const resp = await apiGet(`/api/books/${id}/view`);
+        if (resp.data?.isSplit && Array.isArray(resp.data?.parts) && resp.data.parts.length > 0) {
+          const sorted = resp.data.parts
+            .slice()
+            .sort((a, b) => (a.partNumber || 0) - (b.partNumber || 0));
+          setParts(sorted);
+          const first = sorted[0];
+          setSelectedPartNumber(first?.partNumber || 1);
+          setPdfUrl(first?.viewUrl || resp.data.viewUrl);
+        } else if (resp.data && resp.data.viewUrl) {
+          setParts([]);
+          setSelectedPartNumber(null);
           setPdfUrl(resp.data.viewUrl);
         } else {
-          setPdfUrl(`${API_URL}/api/books/${id}/pdf`);
+          setParts([]);
+          setSelectedPartNumber(null);
+          setPdfUrl(`${RENDER_FALLBACK_BASE}/api/books/${id}/pdf`);
         }
       } catch (e) {
         console.error('Error fetching view URL:', e);
-        setPdfUrl(`${API_URL}/api/books/${id}/pdf`);
+        setParts([]);
+        setSelectedPartNumber(null);
+        setPdfUrl(`${RENDER_FALLBACK_BASE}/api/books/${id}/pdf`);
       }
     };
     fetchView();
   }, [id]);
+
+  useEffect(() => {
+    if (!selectedPartNumber || !Array.isArray(parts) || parts.length === 0) return;
+    const part = parts.find((p) => String(p.partNumber) === String(selectedPartNumber));
+    if (!part?.viewUrl) return;
+    setPdfUrl(part.viewUrl);
+    setError(null);
+    setNumPages(null);
+    setCurrentPage(1);
+    setPageInput('');
+  }, [selectedPartNumber, parts]);
 
   function onDocumentLoadSuccess({ numPages }) {
     setNumPages(numPages);
@@ -124,6 +150,21 @@ const B2Reader = () => {
         </button>
         <div className="topbar-title" title={bookTitle}>{bookTitle}</div>
         <div className="topbar-actions">
+          {parts.length > 0 && (
+            <select
+              className="jump-input"
+              value={selectedPartNumber || ''}
+              onChange={(e) => setSelectedPartNumber(e.target.value)}
+              aria-label="Select part"
+              style={{ width: 120 }}
+            >
+              {parts.map((p) => (
+                <option key={p.partNumber} value={p.partNumber}>
+                  Part {p.partNumber}
+                </option>
+              ))}
+            </select>
+          )}
           <input
             type="number"
             className="jump-input"

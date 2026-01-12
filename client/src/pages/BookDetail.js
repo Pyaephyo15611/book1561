@@ -12,7 +12,6 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { pdfjs } from 'react-pdf';
-import axios from 'axios';
 import {
   ArrowLeft,
   Download,
@@ -24,7 +23,7 @@ import {
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import { getCoverImageUrl } from '../utils/coverImage';
-import { API_URL } from '../utils/apiConfig';
+import { apiGet } from '../utils/apiConfig';
 import './BookDetail.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -32,13 +31,11 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 const BookDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const renderFallbackBase = 'https://minibook-z3t6.onrender.com';
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [recommendedBooks, setRecommendedBooks] = useState([]);
   const [recommendLoading, setRecommendLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [downloadingPart, setDownloadingPart] = useState(null);
   const [pdfParts, setPdfParts] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -63,17 +60,8 @@ const BookDetail = () => {
       setRecommendLoading(true);
       let books = [];
 
-      try {
-        const response = await axios.get(`${API_URL}/api/books`, { timeout: 15000 });
-        books = response.data || [];
-      } catch (apiError) {
-        try {
-          const response2 = await axios.get(`${renderFallbackBase}/api/books`, { timeout: 15000 });
-          books = response2.data || [];
-        } catch (renderError) {
-          throw apiError;
-        }
-      }
+      const response = await apiGet('/api/books');
+      books = response.data || [];
 
       const normalizedCurrentCategory = normalizeCategory(currentCategory);
 
@@ -99,17 +87,17 @@ const BookDetail = () => {
     } finally {
       setRecommendLoading(false);
     }
-  }, [id, renderFallbackBase]);
+  }, [id]);
 
   const fetchBook = useCallback(async () => {
     try {
-      const tryFetchFromBase = async (base) => {
-        const response = await axios.get(`${base}/api/books/${id}`, { timeout: 15000 });
+      try {
+        const response = await apiGet(`/api/books/${id}`);
         setBook(response.data);
         await fetchRecommendedBooks(response.data?.category);
 
         try {
-          const viewResponse = await axios.get(`${base}/api/books/${id}/view`, { timeout: 15000 });
+          const viewResponse = await apiGet(`/api/books/${id}/view`);
           if (viewResponse.data?.isSplit && viewResponse.data?.parts) {
             setPdfParts(viewResponse.data.parts);
           } else if (response.data?.pdfParts && response.data.pdfParts.length > 0) {
@@ -120,28 +108,20 @@ const BookDetail = () => {
             setPdfParts(response.data.pdfParts);
           }
         }
-      };
-
-      try {
-        await tryFetchFromBase(API_URL);
       } catch (apiError) {
         try {
-          await tryFetchFromBase(renderFallbackBase);
-        } catch (renderError) {
-          try {
-            const bookRef = doc(db, 'books', id);
-            const bookSnap = await getDoc(bookRef);
-            if (bookSnap.exists()) {
-              const bookData = { id: bookSnap.id, ...bookSnap.data() };
-              setBook(bookData);
-              await fetchRecommendedBooks(bookData?.category);
-              if (bookData.pdfParts && bookData.pdfParts.length > 0) {
-                setPdfParts(bookData.pdfParts);
-              }
+          const bookRef = doc(db, 'books', id);
+          const bookSnap = await getDoc(bookRef);
+          if (bookSnap.exists()) {
+            const bookData = { id: bookSnap.id, ...bookSnap.data() };
+            setBook(bookData);
+            await fetchRecommendedBooks(bookData?.category);
+            if (bookData.pdfParts && bookData.pdfParts.length > 0) {
+              setPdfParts(bookData.pdfParts);
             }
-          } catch (fsError) {
-            throw renderError;
           }
+        } catch (fsError) {
+          throw apiError;
         }
       }
   } catch (error) {
@@ -149,7 +129,7 @@ const BookDetail = () => {
   } finally {
     setLoading(false);
   }
-  }, [id, fetchRecommendedBooks, renderFallbackBase]);
+  }, [id, fetchRecommendedBooks]);
 
   useEffect(() => {
     fetchBook();
@@ -252,17 +232,10 @@ const BookDetail = () => {
   const handleDownload = async () => {
     const shouldDownload = window.confirm('Download this book?');
     if (!shouldDownload) return;
-
-    // If book has parts, don't use the ZIP download - show individual part downloads instead
-    if (pdfParts && pdfParts.length > 0) {
-      return; // Individual part downloads will be shown in UI
-    }
     
     setDownloading(true);
     try {
-      const response = await axios.get(`${API_URL}/api/books/${id}/download`, {
-        responseType: 'blob'
-      });
+      const response = await apiGet(`/api/books/${id}/download`, { responseType: 'blob' });
 
       // Get filename and content type from headers
       let filename = 'book.pdf';
@@ -303,38 +276,6 @@ const BookDetail = () => {
       alert('Failed to download book. Please try again.');
     } finally {
       setDownloading(false);
-    }
-  };
-
-  const handleDownloadPart = async (partNumber) => {
-    const shouldDownload = window.confirm(`Download Part ${partNumber}?`);
-    if (!shouldDownload) return;
-
-    setDownloadingPart(partNumber);
-    try {
-      const response = await axios.get(`${API_URL}/api/books/${id}/pdf/part/${partNumber}`, {
-        responseType: 'blob'
-      });
-
-      // Create filename for the part
-      const bookTitle = book?.title || 'book';
-      const filename = `${bookTitle}_Part${partNumber}.pdf`;
-
-      // Create a blob URL and trigger download
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading part:', error);
-      alert(`Failed to download part ${partNumber}. Please try again.`);
-    } finally {
-      setDownloadingPart(null);
     }
   };
 
@@ -658,50 +599,19 @@ const BookDetail = () => {
             </div>
 
             <div className="cta-row">
-              {pdfParts && pdfParts.length > 0 ? (
-                <div className="parts-download-section">
-                  <h4 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: '600' }}>
-                    Download Parts:
-                  </h4>
-                  <div className="parts-download-buttons" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
-                    {pdfParts.map((part) => (
-                      <button
-                        key={part.partNumber}
-                        className="cta cta-download"
-                        onClick={() => handleDownloadPart(part.partNumber)}
-                        disabled={downloadingPart === part.partNumber}
-                        style={{ minWidth: '140px' }}
-                      >
-                        {downloadingPart === part.partNumber ? (
-                          <>
-                            <Loader className="spinning" size={18} />
-                            Downloading…
-                          </>
-                        ) : (
-                          <>
-                            <Download size={18} />
-                            Part {part.partNumber}
-                          </>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <button className="cta cta-download" onClick={handleDownload} disabled={downloading}>
-                  {downloading ? (
-                    <>
-                      <Loader className="spinning" size={18} />
-                      Downloading…
-                    </>
-                  ) : (
-                    <>
-                      <Download size={18} />
-                      Free Download
-                    </>
-                  )}
-                </button>
-              )}
+              <button className="cta cta-download" onClick={handleDownload} disabled={downloading}>
+                {downloading ? (
+                  <>
+                    <Loader className="spinning" size={18} />
+                    Downloading…
+                  </>
+                ) : (
+                  <>
+                    <Download size={18} />
+                    Free Download
+                  </>
+                )}
+              </button>
 
               {/* Conditionally restore Read Online when PDF exists */}
               {(pdfParts?.length > 0 || book?.b2FileName || book?.fileName) && (
