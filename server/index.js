@@ -186,10 +186,32 @@ initBooksFile();
 initBlogsFile();
 initSectionsFile();
 
+const B2_APPLICATION_KEY_ID =
+  process.env.B2_APPLICATION_KEY_ID ||
+  process.env.B2_KEY_ID ||
+  process.env.B2_APP_KEY_ID ||
+  process.env.B2_APPLICATION_KEYID ||
+  '';
+
+const B2_APPLICATION_KEY =
+  process.env.B2_APPLICATION_KEY ||
+  process.env.B2_KEY ||
+  process.env.B2_APP_KEY ||
+  process.env.B2_APPLICATIONKEY ||
+  '';
+
+const B2_BUCKET_ID =
+  process.env.B2_BUCKET_ID ||
+  process.env.B2_BUCKETID ||
+  '';
+
+const B2_BUCKET_NAME =
+  process.env.B2_BUCKET_NAME ||
+  process.env.B2_BUCKET ||
+  '';
+
 const hasB2Credentials =
-  process.env.B2_APPLICATION_KEY_ID &&
-  process.env.B2_APPLICATION_KEY &&
-  process.env.B2_BUCKET_ID;
+  Boolean(B2_APPLICATION_KEY_ID && B2_APPLICATION_KEY && B2_BUCKET_ID);
 
 // Cloudinary configuration
 const hasCloudinaryCredentials =
@@ -212,8 +234,8 @@ if (hasCloudinaryCredentials) {
 
 const b2 = hasB2Credentials
   ? new B2({
-      applicationKeyId: process.env.B2_APPLICATION_KEY_ID,
-      applicationKey: process.env.B2_APPLICATION_KEY
+      applicationKeyId: B2_APPLICATION_KEY_ID,
+      applicationKey: B2_APPLICATION_KEY
     })
   : null;
 
@@ -2183,6 +2205,11 @@ app.get('/api/health', async (req, res) => {
         localCount: 0,
         b2Count: null,
         b2Working: false
+      },
+      sections: {
+        localCount: 0,
+        b2Count: null,
+        b2Working: false
       }
     }
   };
@@ -2194,14 +2221,25 @@ app.get('/api/health', async (req, res) => {
       const filesResponse = await b2.listFileNames({
         bucketId: process.env.B2_BUCKET_ID,
         startFileName: 'data/books.json',
-        maxFileCount: 1
+        maxFileCount: 10
       });
-      const booksJsonExists = filesResponse?.data?.files?.some(f => f.fileName === 'data/books.json');
+      const files = filesResponse?.data?.files || [];
+
+      const booksJsonExists = files.some((f) => f.fileName === 'data/books.json');
+      const sectionsJsonExists = files.some((f) => f.fileName === 'data/sections.json');
+
       health.services.backblaze.working = true;
       health.services.books.b2Working = booksJsonExists;
+      health.services.sections.b2Working = sectionsJsonExists;
+
       if (booksJsonExists) {
         const books = await downloadBooksJsonFromB2();
         health.services.books.b2Count = books ? books.length : 0;
+      }
+
+      if (sectionsJsonExists) {
+        const sections = await downloadSectionsJsonFromB2();
+        health.services.sections.b2Count = sections ? sections.length : 0;
       }
     } catch (error) {
       health.services.backblaze.working = false;
@@ -2231,10 +2269,18 @@ app.get('/api/health', async (req, res) => {
     health.status = 'error';
   }
 
+  // Check local sections
+  try {
+    const sections = await getSections();
+    health.services.sections.localCount = sections.length;
+  } catch (error) {
+    health.status = 'error';
+  }
+
   // Overall status
   if (!hasB2Credentials) {
     health.status = 'warning';
-    health.message = 'Backblaze not configured - books will be lost on server restart!';
+    health.message = 'Backblaze not configured - books/sections will be lost on server restart!';
   } else if (!health.services.backblaze.working) {
     health.status = 'error';
     health.message = 'Backblaze connection failed - check your credentials!';
