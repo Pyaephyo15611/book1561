@@ -864,13 +864,13 @@ a:hover {
 
 .trending-row {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
   width: max-content;
   padding: 0.25rem 0 0.75rem;
 }
 
 .trending-row .trending-card {
-  flex: 0 0 170px;
+  flex: 0 0 150px;
 }
 
 .all-books-grid {
@@ -1658,6 +1658,47 @@ a:hover {
   animation: blink 0.7s step-end infinite;
 }
 
+.search-suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 10px);
+  background: #ffffff;
+  border: 2px solid #000;
+  box-shadow: 8px 8px 0 #000;
+  z-index: 50;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.search-suggestion {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-suggestion:hover {
+  background: #f4f4f4;
+}
+
+.search-suggestion-title {
+  font-weight: 700;
+  color: #111;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.search-suggestion-meta {
+  color: #666;
+  font-size: 0.85rem;
+}
+
 @keyframes blink {
   50% { opacity: 0; }
 }
@@ -1673,5 +1714,10 @@ a:hover {
     height: 50px;
     font-size: 16px;
     padding: 10px;
+  }
+
+  .search-suggestions {
+    left: 1rem;
+    right: 1rem;
   }
 }

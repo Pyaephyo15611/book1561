@@ -558,89 +558,10 @@ const Home = () => {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="footer">
         <div className="container">
-          <div className="footer-content">
-            <div className="footer-section">
-              <div className="logo">
-                <BookOpenCheck className="logo-icon" />
-                <span>BookStore</span>
-              </div>
-              <p className="footer-text">
-                Your one-stop destination for free ebooks. Read online or download to your device.
-              </p>
-            </div>
-            
-            <div className="footer-section">
-              <h3>Quick Links</h3>
-              <ul className="footer-links">
-                <li><button className="footer-link" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>Home</button></li>
-                <li><button className="footer-link" onClick={() => window.scrollTo({top: document.querySelector('.books-grid')?.offsetTop - 100, behavior: 'smooth'})}>Browse Books</button></li>
-                <li><button className="footer-link" onClick={() => window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})}>Categories</button></li>
-                <li><button className="footer-link" onClick={() => window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})}>About Us</button></li>
-              </ul>
-            </div>
-            
-            <div className="footer-section">
-              <h3>Categories</h3>
-              <ul className="footer-links">
-                <li>
-                  <button
-                    className="footer-link"
-                    onClick={() => handleCategoryClick('Fiction')}
-                  >
-                    Fiction
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className="footer-link"
-                    onClick={() => handleCategoryClick('Non-Fiction')}
-                  >
-                    Non-Fiction
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className="footer-link"
-                    onClick={() => handleCategoryClick('Science Fiction')}
-                  >
-                    Science Fiction
-                  </button>
-                </li>
-                <li>
-                  <button
-                    className="footer-link"
-                    onClick={() => handleCategoryClick('Romance')}
-                  >
-                    Romance
-                  </button>
-                </li>
-              </ul>
-            </div>
-            
-            <div className="footer-section">
-              <h3>Newsletter</h3>
-              <p className="footer-text">
-                Subscribe to our newsletter for the latest books and updates.
-              </p>
-              <form className="newsletter-form">
-                <input 
-                  type="email" 
-                  placeholder="Your email address" 
-                  required 
-                  className="newsletter-input"
-                />
-                <button type="submit" className="btn btn-primary">
-                  Subscribe
-                </button>
-              </form>
-            </div>
-          </div>
-          
           <div className="footer-bottom">
-            <p>&copy; {new Date().getFullYear()} BookStore. All rights reserved.</p>
+            <p>&copy; 2026 BookStore. မူပိုင်ခွင့်အားလုံး လုံခြုံပါသည်။</p>
           </div>
         </div>
       </footer>

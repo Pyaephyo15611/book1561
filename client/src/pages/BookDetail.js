@@ -50,13 +50,37 @@ const BookDetail = () => {
   const [submittingReply, setSubmittingReply] = useState({});
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
 
-  const fetchRecommendedBooks = useCallback(async () => {
+  const normalizeCategory = (value) => {
+    return String(value || '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLowerCase();
+  };
+
+  const fetchRecommendedBooks = useCallback(async (currentCategory) => {
     try {
       setRecommendLoading(true);
       const response = await axios.get(`${API_URL}/api/books`);
       const books = response.data || [];
-      const filtered = books.filter((b) => b.id !== id).slice(0, 6);
-      setRecommendedBooks(filtered);
+
+      const normalizedCurrentCategory = normalizeCategory(currentCategory);
+
+      let filtered = books
+        .filter((b) => b && b.id && b.id !== id)
+        .filter((b) => {
+          if (!normalizedCurrentCategory) return true;
+          return normalizeCategory(b.category) === normalizedCurrentCategory;
+        });
+
+      // If there aren't enough related books in the same category, fill with any other books.
+      if (filtered.length < 6) {
+        const fallback = books
+          .filter((b) => b && b.id && b.id !== id)
+          .filter((b) => !filtered.some((x) => x.id === b.id));
+        filtered = [...filtered, ...fallback];
+      }
+
+      setRecommendedBooks(filtered.slice(0, 6));
     } catch (error) {
       console.error('Failed to load recommended books', error);
       setRecommendedBooks([]);
@@ -73,6 +97,8 @@ const BookDetail = () => {
         console.log('Book data received:', response.data);
         console.log('Cover image URL:', response.data.coverImage);
         setBook(response.data);
+
+        await fetchRecommendedBooks(response.data?.category);
         
         // Get PDF view URL
         const viewResponse = await axios.get(`${API_URL}/api/books/${id}/view`);
@@ -92,6 +118,8 @@ const BookDetail = () => {
       if (bookSnap.exists()) {
         const bookData = { id: bookSnap.id, ...bookSnap.data() };
         setBook(bookData);
+
+        await fetchRecommendedBooks(bookData?.category);
         
         // Check if book has parts in Firestore
         if (bookData.pdfParts && bookData.pdfParts.length > 0) {
@@ -111,7 +139,6 @@ const BookDetail = () => {
     console.error('Error fetching book:', error);
   } finally {
     setLoading(false);
-    fetchRecommendedBooks();
   }
   }, [id, fetchRecommendedBooks]);
 

@@ -1,10 +1,11 @@
 /* Top navigation bar styled similar to ManyBooks header */
 .navbar {
-  position: relative;
+  position: sticky;
+  top: 0;
   background: linear-gradient(90deg, #ff6b6b 0%, #ff8e72 40%, #ff6fb1 100%);
   color: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 100;
+  z-index: 10000;
 }
 
 .navbar-container {
@@ -16,6 +17,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
+  position: relative;
+  z-index: 10001;
 }
 
 .navbar-logo {
@@ -42,43 +45,139 @@
   border-radius: 0;
   overflow: visible;
   box-shadow: none;
+  position: relative;
+  flex-wrap: nowrap;
 }
 
-.navbar-search input {
-  flex: 1;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: transparent;
-  color: #ffffff;
-  font-size: 0.95rem;
-  padding: 0.55rem 0.75rem;
-  outline: none;
-  border-right: none;
+.navbar-mobile-search-panel {
+  display: none;
 }
 
-.navbar-search input::placeholder {
-  color: rgba(255, 255, 255, 0.85);
+.navbar-mobile-search-panel {
+  position: relative;
 }
 
-.navbar-search-btn {
-  min-width: 3.1rem;
+.navbar-mobile-search-panel .navbar-search-suggestions {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  margin-top: 8px;
+}
+
+.amazon-search {
+  width: 100%;
   display: flex;
+  align-items: stretch;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.amazon-search-leading {
+  width: 44px;
+  min-width: 44px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #10b981;
-  background-color: #10b981;
-  color: #ffffff;
-  cursor: pointer;
-  transition: background-color 0.15s ease, transform 0.1s ease;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  padding: 0.55rem 0.75rem;
+  color: #111;
 }
 
-.navbar-search-btn:hover {
-  background-color: #059669;
-  transform: translateY(-1px);
+.amazon-search-leading svg {
+  display: block !important;
+  width: 20px !important;
+  height: 20px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  stroke: #111 !important;
+  fill: none !important;
 }
+
+.amazon-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 0 12px;
+  font-size: 0.95rem;
+  color: #111;
+  min-width: 0;
+}
+
+.amazon-search-input::placeholder {
+  color: #666;
+}
+
+.amazon-search-btn {
+  border: none;
+  background: transparent;
+  color: #111;
+  width: 46px;
+  min-width: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.amazon-search-btn svg {
+  display: block !important;
+  width: 20px !important;
+  height: 20px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  stroke: #111 !important;
+  fill: none !important;
+}
+
+.amazon-search-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.navbar-search-suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 1001;
+}
+
+.navbar-search-suggestion {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navbar-search-suggestion:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.navbar-search-suggestion-title {
+  font-weight: 700;
+  color: #111;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.navbar-search-suggestion-meta {
+  color: #555;
+  font-size: 0.85rem;
+}
+
+
 
 .navbar-menu {
   display: flex;
@@ -126,6 +225,45 @@
   border: none;
   color: #ffffff;
   cursor: pointer;
+  position: relative;
+  z-index: 10002;
+}
+
+.mobile-search-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  position: relative;
+  z-index: 10002;
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.amazon-search-close {
+  display: none;
+  border: none;
+  background: transparent;
+  color: #111;
+  width: 44px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.amazon-search-close svg {
+  display: block !important;
+  width: 20px !important;
+  height: 20px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  stroke: #111 !important;
+  fill: none !important;
 }
 
 @media (max-width: 768px) {
@@ -141,25 +279,60 @@
   }
 
   .navbar-search {
-    order: 3;              /* ensure search is always on its own row, below logo + menu */
-    width: 100%;
-    max-width: none;
-    margin: 0.5rem 0 0.25rem;
-    flex-basis: 100%;
+    display: none;
+  }
+
+  .navbar-mobile-search-panel {
+    display: none;
+    padding: 0 1.5rem 0.75rem;
+    background: linear-gradient(90deg, #ff6b6b 0%, #ff8e72 40%, #ff6fb1 100%);
+  }
+
+  .navbar-mobile-search-panel.open {
+    display: block;
+  }
+
+  .navbar-mobile-search-panel .amazon-search {
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  .amazon-search-close {
+    display: inline-flex;
+  }
+
+  .navbar-search-suggestions {
+    display: block;
+  }
+
+  .mobile-search-toggle {
+    display: inline-flex;
+    order: 2;
+  }
+
+  .amazon-search-input {
+    font-size: 16px;
   }
 
   .mobile-menu-toggle {
     display: inline-flex;
-    order: 2;              /* logo first, then menu button on same top row */
+    order: 3;              /* logo first, then search icon, then menu button */
+  }
+
+  .navbar-actions {
+    order: 2;
+    margin-left: auto;
   }
 
   .navbar-menu {
-    position: absolute;
-    top: 100%;
+    position: fixed;
+    top: 0;
     right: 0;
     left: 0;
-    padding: 0.75rem 1.5rem 1rem;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.8));
+    z-index: 9999;
+    padding: 5.25rem 1.5rem 1rem;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
     flex-direction: column;
     align-items: flex-end;
     gap: 0.75rem;

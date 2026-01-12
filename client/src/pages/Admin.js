@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, BookOpen, Lock } from 'lucide-react';
+import { Upload, BookOpen, Lock, Layers } from 'lucide-react';
 import { API_URL } from '../utils/apiConfig';
 import './Admin.css';
 
@@ -10,9 +10,9 @@ const Admin = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
-  // Sections management state (currently not rendered in UI)
-  // Keeping state minimal to avoid unused variables during build
   const [sections, setSections] = useState([]);
+  const [sectionForm, setSectionForm] = useState({ title: '', route: '', keywords: '' });
+  const [sectionEdits, setSectionEdits] = useState({});
     
   const [formData, setFormData] = useState({
     title: '',
@@ -24,10 +24,6 @@ const Admin = () => {
     rating: '',
     pdf: null,
     pdfParts: [], // Array of { partNumber, file }
-    autoSplit: false,
-    pagesPerPart: '20',
-    firstPartPages: '10',
-    partsCount: '4',
     isTrending: false
   });
   const [books, setBooks] = useState([]);
@@ -68,6 +64,140 @@ const Admin = () => {
     } catch (err) {
       console.error('Error fetching sections:', err);
       setSections([]);
+    }
+  };
+
+  const handleCreateSection = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(`${API_URL || ''}/api/admin/sections`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-admin-password': adminPassword
+        },
+        body: JSON.stringify({
+          title: sectionForm.title,
+          route: sectionForm.route,
+          keywords: sectionForm.keywords
+        })
+      });
+
+      if (!response.ok) {
+        let msg = `HTTP ${response.status}`;
+        try {
+          const ct = (response.headers.get('content-type') || '').toLowerCase();
+          if (ct.includes('application/json')) {
+            const j = await response.json();
+            msg = j.error || msg;
+          }
+        } catch {}
+        throw new Error(msg);
+      }
+
+      await response.json();
+      setSuccess('Section created');
+      setSectionForm({ title: '', route: '', keywords: '' });
+      fetchSections();
+    } catch (err) {
+      console.error('Create section error:', err);
+      setError(err.message || 'Failed to create section');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveSection = async (section) => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const edit = sectionEdits[section.id] || {};
+      const payload = {
+        title: edit.title !== undefined ? edit.title : section.title,
+        route: edit.route !== undefined ? edit.route : section.route,
+        keywords: edit.keywords !== undefined ? edit.keywords : (Array.isArray(section.keywords) ? section.keywords.join(', ') : '')
+      };
+
+      const response = await fetch(`${API_URL || ''}/api/admin/sections/${encodeURIComponent(section.id)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'x-admin-password': adminPassword
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        let msg = `HTTP ${response.status}`;
+        try {
+          const ct = (response.headers.get('content-type') || '').toLowerCase();
+          if (ct.includes('application/json')) {
+            const j = await response.json();
+            msg = j.error || msg;
+          }
+        } catch {}
+        throw new Error(msg);
+      }
+
+      await response.json();
+      setSuccess('Section updated');
+      setSectionEdits((prev) => {
+        const next = { ...prev };
+        delete next[section.id];
+        return next;
+      });
+      fetchSections();
+    } catch (err) {
+      console.error('Update section error:', err);
+      setError(err.message || 'Failed to update section');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSection = async (section) => {
+    if (!window.confirm('Delete this section?')) return;
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(`${API_URL || ''}/api/admin/sections/${encodeURIComponent(section.id)}`, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'x-admin-password': adminPassword
+        }
+      });
+
+      if (!response.ok) {
+        let msg = `HTTP ${response.status}`;
+        try {
+          const ct = (response.headers.get('content-type') || '').toLowerCase();
+          if (ct.includes('application/json')) {
+            const j = await response.json();
+            msg = j.error || msg;
+          }
+        } catch {}
+        throw new Error(msg);
+      }
+
+      await response.json();
+      setSuccess('Section deleted');
+      fetchSections();
+    } catch (err) {
+      console.error('Delete section error:', err);
+      setError(err.message || 'Failed to delete section');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -121,10 +251,6 @@ const Admin = () => {
       rating: book.rating || '',
       pdf: null,
       pdfParts: book.pdfParts ? book.pdfParts.map((p, i) => ({ partNumber: p.partNumber || i + 1, file: null })) : [],
-      autoSplit: false,
-      pagesPerPart: '20',
-      firstPartPages: '10',
-      partsCount: '4',
       isTrending: !!book.isTrending
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -212,34 +338,12 @@ const Admin = () => {
     const isComic = formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic';
     const hasParts = isComic && formData.pdfParts.length > 0 && formData.pdfParts.some(p => p.file);
     const hasSinglePdf = formData.pdf;
-    const useAutoSplit = !!formData.autoSplit;
     
     if (!hasSinglePdf && !hasParts && !editingId) {
       errors.pdf = isComic ? 'Upload PDF parts or a single PDF file' : 'PDF file is required';
     }
     if (isComic && hasParts && hasSinglePdf) {
       errors.pdf = 'Use either PDF parts OR a single PDF file, not both';
-    }
-
-    if (useAutoSplit && hasParts) {
-      errors.pdf = 'Auto-split requires a single PDF file (do not upload parts)';
-    }
-
-    if (useAutoSplit && !hasSinglePdf && !editingId) {
-      errors.pdf = 'Auto-split requires a single PDF file';
-    }
-
-    if (useAutoSplit) {
-      const ppp = parseInt(formData.pagesPerPart, 10);
-      const pc = parseInt(formData.partsCount, 10);
-      if (!(Number.isFinite(ppp) && ppp > 0) && !(Number.isFinite(pc) && pc > 0)) {
-        errors.pagesPerPart = 'Enter pages per part or parts count';
-      }
-
-      const fpp = parseInt(formData.firstPartPages, 10);
-      if (formData.firstPartPages && !(Number.isFinite(fpp) && fpp > 0)) {
-        errors.firstPartPages = 'First part pages must be a positive number';
-      }
     }
     
     return errors;
@@ -294,13 +398,6 @@ const Admin = () => {
       formDataToSend.append('rating', formData.rating);
       formDataToSend.append('isTrending', formData.isTrending);
 
-      if (formData.autoSplit) {
-        formDataToSend.append('autoSplit', 'true');
-        if (formData.pagesPerPart) formDataToSend.append('pagesPerPart', String(formData.pagesPerPart));
-        if (formData.firstPartPages) formDataToSend.append('firstPartPages', String(formData.firstPartPages));
-        if (formData.partsCount) formDataToSend.append('partsCount', String(formData.partsCount));
-      }
-
       const url = editingId ? `${API_URL || ''}/api/admin/books/${editingId}` : `${API_URL || ''}/api/admin/books`;
       const method = editingId ? 'PUT' : 'POST';
 
@@ -337,10 +434,6 @@ const Admin = () => {
         rating: '',
         pdf: null,
         pdfParts: [],
-        autoSplit: false,
-        pagesPerPart: '20',
-        firstPartPages: '10',
-        partsCount: '4',
         isTrending: false
       });
       setEditingId(null);
@@ -390,11 +483,19 @@ const Admin = () => {
         <div className="admin-tabs">
           <button
             type="button"
-            className={`admin-tab active`}
+            className={`admin-tab ${activeTab === 'books' ? 'active' : ''}`}
             onClick={() => setActiveTab('books')}
           >
             <BookOpen size={20} />
             Books
+          </button>
+          <button
+            type="button"
+            className={`admin-tab ${activeTab === 'sections' ? 'active' : ''}`}
+            onClick={() => setActiveTab('sections')}
+          >
+            <Layers size={20} />
+            Sections
           </button>
         </div>
 
@@ -626,85 +727,11 @@ const Admin = () => {
               </small>
             </div>
 
-            {(formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic') && (
-              <div className="form-group full-width">
-                <label>Auto Split (recommended for faster loading)</label>
-                <div className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    id="autoSplit"
-                    name="autoSplit"
-                    checked={!!formData.autoSplit}
-                    onChange={(e) => setFormData(prev => ({ ...prev, autoSplit: e.target.checked }))}
-                  />
-                  <span>Split the uploaded PDF into smaller parts automatically</span>
-                </div>
-
-                {formData.autoSplit && (
-                  <div style={{ marginTop: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <div>
-                      <label htmlFor="pagesPerPart">Pages per part</label>
-                      <input
-                        type="number"
-                        id="pagesPerPart"
-                        name="pagesPerPart"
-                        value={formData.pagesPerPart}
-                        onChange={handleInputChange}
-                        className={`form-input ${fieldErrors.pagesPerPart ? 'error' : ''}`}
-                        min="1"
-                        placeholder="e.g. 20"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="firstPartPages">First part pages (optional)</label>
-                      <input
-                        type="number"
-                        id="firstPartPages"
-                        name="firstPartPages"
-                        value={formData.firstPartPages}
-                        onChange={handleInputChange}
-                        className={`form-input ${fieldErrors.firstPartPages ? 'error' : ''}`}
-                        min="1"
-                        placeholder="e.g. 8"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="partsCount">OR parts count</label>
-                      <input
-                        type="number"
-                        id="partsCount"
-                        name="partsCount"
-                        value={formData.partsCount}
-                        onChange={handleInputChange}
-                        className="form-input"
-                        min="1"
-                        placeholder="e.g. 4"
-                      />
-                    </div>
-                    {fieldErrors.pagesPerPart && (
-                      <small className="field-error" style={{ gridColumn: '1 / -1' }}>{fieldErrors.pagesPerPart}</small>
-                    )}
-                    {fieldErrors.firstPartPages && (
-                      <small className="field-error" style={{ gridColumn: '1 / -1' }}>{fieldErrors.firstPartPages}</small>
-                    )}
-                    <small className="form-hint" style={{ gridColumn: '1 / -1' }}>
-                      Tip: Set pages-per-part to control how many pages each part has. Smaller parts load faster.
-                    </small>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* PDF Parts Upload for Comics */}
             {(formData.category === 'ရုပ်ပြ' || formData.category === 'comic' || formData.category === 'graphic') && (
               <div className="form-group full-width">
                 <label>PDF Parts (for Comics/Manga) *</label>
                 <div className="pdf-parts-upload">
-                  {formData.autoSplit && (
-                    <div className="error-message" style={{ marginBottom: '10px' }}>
-                      Auto-split is enabled. Please upload only a single PDF above (do not upload parts).
-                    </div>
-                  )}
                   <div className="parts-list">
                     {formData.pdfParts.map((part, index) => (
                       <div key={index} className="part-item">
@@ -719,7 +746,6 @@ const Admin = () => {
                             newParts.forEach((p, i) => { p.partNumber = i + 1; });
                             setFormData(prev => ({ ...prev, pdfParts: newParts }));
                           }}
-                          disabled={!!formData.autoSplit}
                         >
                           Remove
                         </button>
@@ -736,7 +762,6 @@ const Admin = () => {
                         pdfParts: [...prev.pdfParts, { partNumber, file: null }]
                       }));
                     }}
-                    disabled={!!formData.autoSplit}
                   >
                     + Add Part {formData.pdfParts.length + 1}
                   </button>
@@ -758,7 +783,6 @@ const Admin = () => {
                           }
                         }}
                         className="file-input"
-                        disabled={!!formData.autoSplit}
                       />
                     </div>
                   ))}
@@ -834,6 +858,173 @@ const Admin = () => {
             {books.length === 0 && <div className="empty-row">No books yet</div>}
           </div>
         )}
+          </>
+        )}
+
+        {activeTab === 'sections' && (
+          <>
+            <div className="admin-header">
+              <h1>
+                <Layers size={32} />
+                Manage Sections
+              </h1>
+              <p>Create new sections and edit section names shown on the home page.</p>
+            </div>
+
+            {success && (
+              <div className="success-message">
+                {success}
+              </div>
+            )}
+
+            {error && (
+              <div className="error-message">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateSection} className="admin-form">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="sectionTitle">Section Name *</label>
+                  <input
+                    id="sectionTitle"
+                    type="text"
+                    className="form-input"
+                    value={sectionForm.title}
+                    onChange={(e) => setSectionForm((p) => ({ ...p, title: e.target.value }))}
+                    required
+                    placeholder="e.g., သုတစာပေများ"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="sectionRoute">Route / Category Value *</label>
+                  <input
+                    id="sectionRoute"
+                    type="text"
+                    className="form-input"
+                    value={sectionForm.route}
+                    onChange={(e) => setSectionForm((p) => ({ ...p, route: e.target.value }))}
+                    required
+                    placeholder="e.g., သုတ"
+                  />
+                </div>
+
+                <div className="form-group full-width">
+                  <label htmlFor="sectionKeywords">Keywords (comma separated)</label>
+                  <input
+                    id="sectionKeywords"
+                    type="text"
+                    className="form-input"
+                    value={sectionForm.keywords}
+                    onChange={(e) => setSectionForm((p) => ({ ...p, keywords: e.target.value }))}
+                    placeholder="e.g., education, knowledge, သုတ"
+                  />
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  onClick={() => setIsAuthenticated(false)}
+                  className="btn-secondary"
+                >
+                  Logout
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={loading}
+                >
+                  {loading ? 'Saving...' : 'Add Section'}
+                </button>
+              </div>
+            </form>
+
+            <div className="admin-header" style={{ marginTop: '2rem' }}>
+              <h2>All Sections</h2>
+              <p>Edit section name/title then click Save.</p>
+            </div>
+
+            <div className="books-table">
+              <div className="books-table-header">
+                <div>Title</div>
+                <div>Route</div>
+                <div>Keywords</div>
+                <div>Actions</div>
+              </div>
+
+              {(sections || []).map((s) => {
+                const edit = sectionEdits[s.id] || {};
+                const keywordsStr = Array.isArray(s.keywords) ? s.keywords.join(', ') : '';
+                return (
+                  <div className="books-table-row" key={s.id || s.route}>
+                    <div className="cell title">
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={edit.title !== undefined ? edit.title : (s.title || '')}
+                        onChange={(e) =>
+                          setSectionEdits((prev) => ({
+                            ...prev,
+                            [s.id]: { ...(prev[s.id] || {}), title: e.target.value }
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="cell">
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={edit.route !== undefined ? edit.route : (s.route || '')}
+                        onChange={(e) =>
+                          setSectionEdits((prev) => ({
+                            ...prev,
+                            [s.id]: { ...(prev[s.id] || {}), route: e.target.value }
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="cell">
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={edit.keywords !== undefined ? edit.keywords : keywordsStr}
+                        onChange={(e) =>
+                          setSectionEdits((prev) => ({
+                            ...prev,
+                            [s.id]: { ...(prev[s.id] || {}), keywords: e.target.value }
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="cell actions">
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => handleSaveSection(s)}
+                        disabled={loading}
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        onClick={() => handleDeleteSection(s)}
+                        disabled={loading}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {(!sections || sections.length === 0) && (
+                <div className="empty-row">No sections yet</div>
+              )}
+            </div>
           </>
         )}
 

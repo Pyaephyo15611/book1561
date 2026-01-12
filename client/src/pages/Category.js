@@ -16,6 +16,7 @@ const Category = () => {
   const [sortBy, setSortBy] = useState('recent');
   const [view, setView] = useState('grid');
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -94,6 +95,40 @@ const Category = () => {
       }
     });
 
+  useEffect(() => {
+    setPage(1);
+  }, [name, query, sortBy, view]);
+
+  const PAGE_SIZE = view === 'list' ? 10 : window.innerWidth <= 576 ? 8 : 18;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * PAGE_SIZE;
+  const paginated = filtered.slice(startIndex, startIndex + PAGE_SIZE);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [name, safePage]);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxButtons = 7;
+    if (totalPages <= maxButtons) {
+      for (let i = 1; i <= totalPages; i += 1) pages.push(i);
+      return pages;
+    }
+
+    pages.push(1);
+    const start = Math.max(2, safePage - 2);
+    const end = Math.min(totalPages - 1, safePage + 2);
+
+    if (start > 2) pages.push('…');
+    for (let i = start; i <= end; i += 1) pages.push(i);
+    if (end < totalPages - 1) pages.push('…');
+
+    pages.push(totalPages);
+    return pages;
+  };
+
   const routeKey = decodeURIComponent(name || '');
   const matchedSection = sections.find((s) => normalizeCategory(s?.route) === normalizeCategory(routeKey));
   const displayCategoryName = matchedSection?.title || routeKey;
@@ -156,8 +191,9 @@ const Category = () => {
                 <p>No books in this category yet.</p>
               </div>
             ) : (
-              <div className={view === 'grid' ? 'cat-grid' : 'cat-list'}>
-                {filtered.map((book) => (
+              <>
+                <div className={view === 'grid' ? 'cat-grid' : 'cat-list'}>
+                  {paginated.map((book) => (
                   <div
                     key={book.id}
                     className="cat-card"
@@ -190,8 +226,48 @@ const Category = () => {
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+
+                {totalPages > 1 ? (
+                  <div className="cat-pagination">
+                    <button
+                      type="button"
+                      className="cat-page-btn"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={safePage === 1}
+                    >
+                      Prev
+                    </button>
+
+                    <div className="cat-page-numbers" aria-label="Pagination">
+                      {getPageNumbers().map((p, idx) =>
+                        p === '…' ? (
+                          <span key={`dots-${idx}`} className="cat-page-dots">…</span>
+                        ) : (
+                          <button
+                            key={p}
+                            type="button"
+                            className={p === safePage ? 'cat-page-number active' : 'cat-page-number'}
+                            onClick={() => setPage(p)}
+                          >
+                            {p}
+                          </button>
+                        )
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="cat-page-btn"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safePage === totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         </section>

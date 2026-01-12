@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { collection, getDocs } from 'firebase/firestore/lite';
@@ -11,7 +12,6 @@ import {
   Twitter,
   Youtube
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import CategorySection from '../components/CategorySection';
 import BookSkeleton from '../components/BookSkeleton';
@@ -26,7 +26,6 @@ const Home = () => {
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const defaultCategorySections = [
     {
       title: 'တာရာပွကြီး',
@@ -203,17 +202,10 @@ const Home = () => {
         const response = await axios.get(`${API_URL}/api/sections`);
         const data = response.data;
         if (Array.isArray(data) && data.length > 0) {
-          const titleOverrides = {
-            'ရသစာပေ': 'တာရာပွကြီး',
-            'ရုပ်ပြ': 'မြိုင်ရာဇာ တွတ်ပီ ',
-            'ဝတ္ထုတို': 'ဘိုဘို',
-            'ကိုတင့် ကိုရွှေထူး': 'ကိုတင့် ကိုရွှေထူး',
-            'ကာတွန်းနှင့်ရုပ်ပြများ': 'ကာတွန်းနှင့်ရုပ်ပြများ'
-          };
           const normalized = data
             .filter((s) => s && s.title && s.route)
             .map((s) => ({
-              title: titleOverrides[s.route] || s.title,
+              title: s.title,
               route: s.route,
               keywords: Array.isArray(s.keywords) ? s.keywords : []
             }));
@@ -229,22 +221,6 @@ const Home = () => {
     // defaultCategorySections is a constant defined in render scope; safe to ignore per ESLint rules
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [API_URL]);
-
-  useEffect(() => {
-    if (!searchTerm) {
-      setFilteredBooks(books);
-      return;
-    }
-
-    const term = searchTerm.toLowerCase();
-    const filtered = books.filter((book) =>
-      book.title?.toLowerCase().includes(term) ||
-      book.author?.toLowerCase().includes(term) ||
-      book.description?.toLowerCase().includes(term) ||
-      book.category?.toLowerCase().includes(term)
-    );
-    setFilteredBooks(filtered);
-  }, [searchTerm, books]);
 
   const displayBooks = filteredBooks.length > 0 ? filteredBooks : books;
 
@@ -357,27 +333,6 @@ const Home = () => {
         </header>
 
       <main className="main-content">
-        {/* Search bar and quick filters */}
-        <section className="section search-section">
-          <div className="container">
-            <div className="input-container">
-              <input
-                className="input"
-                name="text"
-                type="text"
-                placeholder="Search for books..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && searchTerm.trim()) {
-                    navigate(`/search/${encodeURIComponent(searchTerm.trim())}`);
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </section>
-
         {/* News Books Section with horizontal scroll */}
         <section className="section news-books">
           <div className="container">
@@ -481,9 +436,17 @@ const Home = () => {
         <>
           {categorySections.map((category) => {
             const categoryBooks = displayBooks.filter((book) => {
-              if (category?.route === 'ကာတွန်းနှင့်ရုပ်ပြများ') {
-                return matchBookToExactCategoryRoute(book, category.route);
+              // Always allow explicit category assignment to the section route.
+              // This makes newly-created admin sections work even when keywords are empty.
+              if (matchBookToExactCategoryRoute(book, category?.route)) {
+                return true;
               }
+
+              // For this specific category, do not use fuzzy keyword matching because it overlaps heavily.
+              if (category?.route === 'ကာတွန်းနှင့်ရုပ်ပြများ') {
+                return false;
+              }
+
               return matchBookToCategory(book, category.keywords);
             });
             
@@ -505,56 +468,10 @@ const Home = () => {
 
       </main>
 
-      {/* Footer with Myanmar Language Navigation */}
       <footer className="footer">
         <div className="container">
-          <div className="footer-content">
-            <div className="footer-section">
-              <h3>ဆက်သွယ်ရန်</h3>
-              <ul className="footer-links">
-                <li><button className="footer-link" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>ပင်မစာမျက်နှာ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/')}>စာအုပ်များ</button></li>
-                <li><button className="footer-link" onClick={() => window.scrollTo({top: document.querySelector('.news-books')?.offsetTop - 100, behavior: 'smooth'})}>စာအုပ်အသစ်များ</button></li>
-                <li><button className="footer-link" onClick={() => window.scrollTo({top: document.querySelector('.news-books')?.offsetTop - 100, behavior: 'smooth'})}>ရေပန်းစားစာအုပ်များ</button></li>
-              </ul>
-            </div>
-            
-            <div className="footer-section">
-              <h3>စာအုပ်အမျိုးအစားများ</h3>
-              <ul className="footer-links">
-                <li><button className="footer-link" onClick={() => navigate('/category/ရသစာပေ')}>တာရာပွကြီး</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/အောင်မြင်ရေး')}>အောင်မြင်ရေးစာပေများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ရုပ်ပြ')}>မြိုင်ရာဇာ တွတ်ပီ </button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ဝတ္ထုတို')}>ဘိုဘို</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ကိုတင့် ကိုရွှေထူး')}>ကိုတင့် ကိုရွှေထူး</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ကာတွန်းနှင့်ရုပ်ပြများ')}>ကာတွန်းနှင့်ရုပ်ပြများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/သုတ')}>သုတစာပေများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/category/ကဗျာ')}>ကဗျာစာအုပ်များ</button></li>
-              </ul>
-            </div>
-            
-            <div className="footer-section">
-              <h3>အကြောင်းအရာ</h3>
-              <ul className="footer-links">
-                <li><button className="footer-link" onClick={() => navigate('/')}>ကျွန်ုပ်တို့အကြောင်း</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/')}>ဆက်သွယ်ရန်</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/')}>မူဝါဒများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/')}>ကိုယ်ရေးလုံခြုံမှု</button></li>
-              </ul>
-            </div>
-            
-            <div className="footer-section">
-              <h3>အခြားသော</h3>
-              <ul className="footer-links">
-                <li><button className="footer-link" onClick={() => navigate('/')}>အကူအညီ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/')}>မေးခွန်းများ</button></li>
-                <li><button className="footer-link" onClick={() => navigate('/')}>သတင်းစကား</button></li>
-              </ul>
-            </div>
-          </div>
-          
           <div className="footer-bottom">
-            <p>&copy; {new Date().getFullYear()} BookStore. မူပိုင်ခွင့်အားလုံး လုံခြုံပါသည်။</p>
+            <p>&copy; 2026 BookStore. မူပိုင်ခွင့်အားလုံး လုံခြုံပါသည်။</p>
           </div>
         </div>
       </footer>

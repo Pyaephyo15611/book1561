@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, ArrowLeft } from 'lucide-react';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import { API_URL } from '../utils/apiConfig';
@@ -9,6 +9,7 @@ import './Home.css';
 const Search = () => {
   const { term } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,11 +28,20 @@ const Search = () => {
   }, []);
 
   const query = decodeURIComponent(term || '').toLowerCase();
+  const searchParams = new URLSearchParams(location.search);
+  const categoryFilter = decodeURIComponent(searchParams.get('cat') || '').trim();
+  const normalizedCategoryFilter = categoryFilter.toLowerCase();
+
   const filtered = books.filter((b) => {
     const title = b.title || '';
     const author = b.author || '';
     const description = b.description || '';
     const category = b.category || '';
+
+    if (normalizedCategoryFilter) {
+      if ((category || '').toLowerCase() !== normalizedCategoryFilter) return false;
+    }
+
     return (
       title.toLowerCase().includes(query) ||
       author.toLowerCase().includes(query) ||
@@ -48,7 +58,9 @@ const Search = () => {
             <div className="section-header" style={{ alignItems: 'center', gap: '1rem' }}>
               <div>
                 <span className="section-eyebrow">Search</span>
-                <h2 className="section-title">“{decodeURIComponent(term || '')}”</h2>
+                <h2 className="section-title">
+                  “{decodeURIComponent(term || '')}”{categoryFilter ? ` in ${categoryFilter}` : ''}
+                </h2>
               </div>
               <button className="btn btn-outline" onClick={() => navigate(-1)}>
                 <ArrowLeft size={18} /> Back

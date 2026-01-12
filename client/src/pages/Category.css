@@ -157,3 +157,56 @@
   .cat-grid { grid-template-columns: repeat(2, 1fr); }
   .cat-list .cat-card { grid-template-columns: 100px 1fr; }
 }
+
+.cat-pagination {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.cat-page-btn {
+  background: #2c2f33;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.cat-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cat-page-numbers {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cat-page-number {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #2c2f33;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.cat-page-number.active {
+  background: #3b3f45;
+  opacity: 1;
+}
+
+.cat-page-dots {
+  color: rgba(255,255,255,0.7);
+  padding: 0 4px;
+}
