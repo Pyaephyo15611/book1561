@@ -32,6 +32,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/$
 const BookDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const renderFallbackBase = 'https://minibook-z3t6.onrender.com';
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [recommendedBooks, setRecommendedBooks] = useState([]);
@@ -60,8 +61,19 @@ const BookDetail = () => {
   const fetchRecommendedBooks = useCallback(async (currentCategory) => {
     try {
       setRecommendLoading(true);
-      const response = await axios.get(`${API_URL}/api/books`);
-      const books = response.data || [];
+      let books = [];
+
+      try {
+        const response = await axios.get(`${API_URL}/api/books`, { timeout: 15000 });
+        books = response.data || [];
+      } catch (apiError) {
+        try {
+          const response2 = await axios.get(`${renderFallbackBase}/api/books`, { timeout: 15000 });
+          books = response2.data || [];
+        } catch (renderError) {
+          throw apiError;
+        }
+      }
 
       const normalizedCurrentCategory = normalizeCategory(currentCategory);
 
@@ -87,60 +99,57 @@ const BookDetail = () => {
     } finally {
       setRecommendLoading(false);
     }
-  }, [id]);
+  }, [id, renderFallbackBase]);
 
   const fetchBook = useCallback(async () => {
     try {
-      // Try API first
-      try {
-        const response = await axios.get(`${API_URL}/api/books/${id}`);
-        console.log('Book data received:', response.data);
-        console.log('Cover image URL:', response.data.coverImage);
+      const tryFetchFromBase = async (base) => {
+        const response = await axios.get(`${base}/api/books/${id}`, { timeout: 15000 });
         setBook(response.data);
-
         await fetchRecommendedBooks(response.data?.category);
-        
-        // Get PDF view URL
-        const viewResponse = await axios.get(`${API_URL}/api/books/${id}/view`);
-        const viewUrl = viewResponse.data.viewUrl;
-        console.log('PDF view URL:', viewUrl);
-        
-        // Check if book has parts
-        if (viewResponse.data.isSplit && viewResponse.data.parts) {
-          setPdfParts(viewResponse.data.parts);
-        } else if (response.data.pdfParts && response.data.pdfParts.length > 0) {
-          setPdfParts(response.data.pdfParts);
-        }
-    } catch (apiError) {
-      // Fallback to Firestore
-      const bookRef = doc(db, 'books', id);
-      const bookSnap = await getDoc(bookRef);
-      if (bookSnap.exists()) {
-        const bookData = { id: bookSnap.id, ...bookSnap.data() };
-        setBook(bookData);
 
-        await fetchRecommendedBooks(bookData?.category);
-        
-        // Check if book has parts in Firestore
-        if (bookData.pdfParts && bookData.pdfParts.length > 0) {
-          setPdfParts(bookData.pdfParts);
+        try {
+          const viewResponse = await axios.get(`${base}/api/books/${id}/view`, { timeout: 15000 });
+          if (viewResponse.data?.isSplit && viewResponse.data?.parts) {
+            setPdfParts(viewResponse.data.parts);
+          } else if (response.data?.pdfParts && response.data.pdfParts.length > 0) {
+            setPdfParts(response.data.pdfParts);
+          }
+        } catch (e) {
+          if (response.data?.pdfParts && response.data.pdfParts.length > 0) {
+            setPdfParts(response.data.pdfParts);
+          }
         }
-        
-        // Construct PDF URL from Backblaze
-        const fileName = bookData.b2FileName || bookData.fileName;
-        if (fileName) {
-          // Use server proxy to avoid CORS when hitting Backblaze directly
-          const viewUrl = `${API_URL}/api/books/${id}/pdf`;
-          console.log('PDF view URL (fallback via proxy):', viewUrl);
+      };
+
+      try {
+        await tryFetchFromBase(API_URL);
+      } catch (apiError) {
+        try {
+          await tryFetchFromBase(renderFallbackBase);
+        } catch (renderError) {
+          try {
+            const bookRef = doc(db, 'books', id);
+            const bookSnap = await getDoc(bookRef);
+            if (bookSnap.exists()) {
+              const bookData = { id: bookSnap.id, ...bookSnap.data() };
+              setBook(bookData);
+              await fetchRecommendedBooks(bookData?.category);
+              if (bookData.pdfParts && bookData.pdfParts.length > 0) {
+                setPdfParts(bookData.pdfParts);
+              }
+            }
+          } catch (fsError) {
+            throw renderError;
+          }
         }
       }
-    }
   } catch (error) {
     console.error('Error fetching book:', error);
   } finally {
     setLoading(false);
   }
-  }, [id, fetchRecommendedBooks]);
+  }, [id, fetchRecommendedBooks, renderFallbackBase]);
 
   useEffect(() => {
     fetchBook();
