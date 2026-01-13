@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
-import { BookOpen, ArrowLeft } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import { API_URL } from '../utils/apiConfig';
 import './Home.css';
@@ -13,10 +13,27 @@ const Category = () => {
   const [books, setBooks] = useState([]);
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState('recent');
-  const [view, setView] = useState('grid');
-  const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+
+  const getDefaultBannerUrl = (sectionLike) => {
+    const seed = String(sectionLike?.id || sectionLike?.route || sectionLike?.title || 'category');
+    const hash = seed.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+
+    // Real natural book-themed photos (Unsplash). Deterministic pick per section.
+    // If you ever want different photos, just swap/extend this list.
+    const banners = [
+      'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1600&h=420&q=80',
+      'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1600&h=420&q=80',
+      'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=1600&h=420&q=80',
+      'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1600&h=420&q=80',
+      'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1600&h=420&q=80',
+      'https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=1600&h=420&q=80',
+      'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=1600&h=420&q=80',
+      'https://images.unsplash.com/photo-1524578271613-d550eacf6090?auto=format&fit=crop&w=1600&h=420&q=80'
+    ];
+
+    return banners[hash % banners.length];
+  };
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -62,34 +79,13 @@ const Category = () => {
     return bookCategory === routeCategory;
   };
 
-  const filtered = books
-    .filter((b) => categoryMatches(b.category, name))
-    .filter((b) => {
-      if (!query.trim()) return true;
-      const q = query.toLowerCase();
-      return (
-        b.title?.toLowerCase().includes(q) ||
-        b.author?.toLowerCase().includes(q) ||
-        b.description?.toLowerCase().includes(q)
-      );
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'title':
-          return (a.title || '').localeCompare(b.title || '');
-        case 'author':
-          return (a.author || '').localeCompare(b.author || '');
-        case 'recent':
-        default:
-          return 0;
-      }
-    });
+  const filtered = books.filter((b) => categoryMatches(b.category, name));
 
   useEffect(() => {
     setPage(1);
-  }, [name, query, sortBy, view]);
+  }, [name]);
 
-  const PAGE_SIZE = view === 'list' ? 10 : window.innerWidth <= 576 ? 8 : 18;
+  const PAGE_SIZE = window.innerWidth <= 576 ? 8 : 18;
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const startIndex = (safePage - 1) * PAGE_SIZE;
@@ -122,52 +118,18 @@ const Category = () => {
   const routeKey = decodeURIComponent(name || '');
   const matchedSection = sections.find((s) => normalizeCategory(s?.route) === normalizeCategory(routeKey));
   const displayCategoryName = matchedSection?.title || routeKey;
+  const bannerUrl = matchedSection?.bannerImageUrl || matchedSection?.bannerImage || getDefaultBannerUrl(matchedSection || { title: displayCategoryName, route: routeKey });
 
   return (
     <div className="home-page category-page">
       <main className="main-content">
         <section className="section">
           <div className="container">
-            <div className="cat-header">
-              <div className="cat-title">
-                <button className="btn btn-outline" onClick={() => navigate(-1)}>
-                  <ArrowLeft size={18} /> Back
-                </button>
-                <div>
-                  <span className="section-eyebrow">Category</span>
-                  <h2 className="section-title">{displayCategoryName}</h2>
-                </div>
+            {bannerUrl ? (
+              <div className="cat-banner">
+                <img src={bannerUrl} alt={displayCategoryName} loading="lazy" />
               </div>
-              <div className="cat-actions">
-                <div className="cat-search">
-                  <input
-                    type="text"
-                    placeholder="Search in this category..."
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                </div>
-                <div className="cat-filters">
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                    <option value="recent">Most recent</option>
-                    <option value="title">Title A–Z</option>
-                    <option value="author">Author A–Z</option>
-                  </select>
-                  <div className="view-toggle">
-                    <button
-                      className={view === 'grid' ? 'active' : ''}
-                      onClick={() => setView('grid')}
-                      aria-label="Grid view"
-                    >▦</button>
-                    <button
-                      className={view === 'list' ? 'active' : ''}
-                      onClick={() => setView('list')}
-                      aria-label="List view"
-                    >≣</button>
-                  </div>
-                </div>
-              </div>
-            </div>
+            ) : null}
 
             {loading ? (
               <div className="no-results">
@@ -182,7 +144,7 @@ const Category = () => {
               </div>
             ) : (
               <>
-                <div className={view === 'grid' ? 'cat-grid' : 'cat-list'}>
+                <div className={'cat-grid'}>
                   {paginated.map((book) => (
                   <div
                     key={book.id}
@@ -194,7 +156,7 @@ const Category = () => {
                   >
                     <div className="cat-cover">
                       <img
-                        src={getCoverImageUrl(book)}
+                        src={getCoverImageUrl(book) || getDefaultCoverImage(book)}
                         alt={book.title}
                         loading="lazy"
                         onError={(e) => {

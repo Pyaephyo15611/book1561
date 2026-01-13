@@ -11,7 +11,7 @@ const Admin = () => {
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [sections, setSections] = useState([]);
-  const [sectionForm, setSectionForm] = useState({ title: '', route: '', keywords: '' });
+  const [sectionForm, setSectionForm] = useState({ title: '', route: '', keywords: '', layout: 'scroll' });
   const [sectionEdits, setSectionEdits] = useState({});
     
   const [formData, setFormData] = useState({
@@ -87,7 +87,8 @@ const Admin = () => {
         body: JSON.stringify({
           title: sectionForm.title,
           route: sectionForm.route,
-          keywords: sectionForm.keywords
+          keywords: sectionForm.keywords,
+          layout: sectionForm.layout
         })
       });
 
@@ -105,7 +106,7 @@ const Admin = () => {
 
       await response.json();
       setSuccess('Section created');
-      setSectionForm({ title: '', route: '', keywords: '' });
+      setSectionForm({ title: '', route: '', keywords: '', layout: 'scroll' });
       fetchSections();
     } catch (err) {
       console.error('Create section error:', err);
@@ -114,6 +115,7 @@ const Admin = () => {
       setLoading(false);
     }
   };
+
 
   const handleSaveSection = async (section) => {
     setLoading(true);
@@ -125,7 +127,8 @@ const Admin = () => {
       const payload = {
         title: edit.title !== undefined ? edit.title : section.title,
         route: edit.route !== undefined ? edit.route : section.route,
-        keywords: edit.keywords !== undefined ? edit.keywords : (Array.isArray(section.keywords) ? section.keywords.join(', ') : '')
+        keywords: edit.keywords !== undefined ? edit.keywords : (Array.isArray(section.keywords) ? section.keywords.join(', ') : ''),
+        layout: edit.layout !== undefined ? edit.layout : (section.layout || 'scroll')
       };
 
       const response = await fetch(`${API_URL || ''}/api/admin/sections/${encodeURIComponent(section.id)}`, {
@@ -912,6 +915,19 @@ const Admin = () => {
                     placeholder="e.g., education, knowledge, သုတ"
                   />
                 </div>
+
+                <div className="form-group">
+                  <label htmlFor="sectionLayout">Layout</label>
+                  <select
+                    id="sectionLayout"
+                    className="form-input"
+                    value={sectionForm.layout}
+                    onChange={(e) => setSectionForm((p) => ({ ...p, layout: e.target.value }))}
+                  >
+                    <option value="scroll">Scroll</option>
+                    <option value="grid">Grid</option>
+                  </select>
+                </div>
               </div>
 
               <div className="form-actions">
@@ -942,12 +958,14 @@ const Admin = () => {
                 <div>Title</div>
                 <div>Route</div>
                 <div>Keywords</div>
+                <div>Layout</div>
                 <div>Actions</div>
               </div>
 
               {(sections || []).map((s) => {
                 const edit = sectionEdits[s.id] || {};
                 const keywordsStr = Array.isArray(s.keywords) ? s.keywords.join(', ') : '';
+                const layoutValue = s.layout || 'scroll';
                 return (
                   <div className="books-table-row" key={s.id || s.route}>
                     <div className="cell title">
@@ -988,6 +1006,21 @@ const Admin = () => {
                           }))
                         }
                       />
+                    </div>
+                    <div className="cell">
+                      <select
+                        className="form-input"
+                        value={edit.layout !== undefined ? edit.layout : layoutValue}
+                        onChange={(e) =>
+                          setSectionEdits((prev) => ({
+                            ...prev,
+                            [s.id]: { ...(prev[s.id] || {}), layout: e.target.value }
+                          }))
+                        }
+                      >
+                        <option value="scroll">Scroll</option>
+                        <option value="grid">Grid</option>
+                      </select>
                     </div>
                     <div className="cell actions">
                       <button

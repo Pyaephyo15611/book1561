@@ -28,12 +28,7 @@ body {
   font-family: 'Inter', 'Noto Sans Myanmar', 'Myanmar Text', 'Padauk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   line-height: 1.5;
   color: var(--gray-900);
-  background:
-    radial-gradient(circle at 10px 10px, rgba(0, 0, 0, 0.08) 1.1px, transparent 1.1px),
-    radial-gradient(circle at 40px 40px, rgba(0, 0, 0, 0.06) 1.1px, transparent 1.1px),
-    #f5f6f8;
-  background-size: 50px 50px;
-  background-attachment: fixed;
+  background: var(--bs-bg);
 }
 
 /* Animated dotted background for home */
@@ -41,11 +36,7 @@ body {
   position: relative;
   overflow: hidden;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 10px 10px, rgba(0, 0, 0, 0.08) 1.1px, transparent 1.1px),
-    radial-gradient(circle at 40px 40px, rgba(0, 0, 0, 0.06) 1.1px, transparent 1.1px),
-    #f5f6f8;
-  background-size: 50px 50px;
+  background: var(--bs-bg);
 }
 
 .home-page::before,
@@ -53,7 +44,7 @@ body {
   content: "";
   position: absolute;
   inset: -25%;
-  background: radial-gradient(circle, rgba(79, 70, 229, 0.12) 0%, rgba(79, 70, 229, 0) 60%);
+  background: radial-gradient(circle, rgba(123, 45, 47, 0.06) 0%, rgba(123, 45, 47, 0) 60%);
   animation: floatDots 20s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
@@ -169,7 +160,7 @@ a:hover {
 .hero {
   position: relative;
   padding: 5.5rem 0 5rem;
-  color: white;
+  color: var(--bs-text);
   margin-top: 1.5rem; /* tighter spacing to navbar */
   overflow: hidden;
 }
@@ -340,11 +331,12 @@ a:hover {
   line-height: 1.1;
   font-weight: 800;
   margin: 0;
+  color: var(--bs-text);
 }
 
 .banner-inner .text-base {
   font-size: 1.05rem;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--bs-muted);
   margin: 0;
   max-width: 46ch;
 }
@@ -598,14 +590,14 @@ a:hover {
 .section-title {
   font-size: 1.875rem;
   font-weight: 700;
-  color: var(--gray-900);
+  color: var(--bs-text);
 }
 
 .section-eyebrow {
   text-transform: uppercase;
   font-size: 0.85rem;
   letter-spacing: 0.2em;
-  color: var(--gray-500);
+  color: var(--bs-muted);
   margin-bottom: 0.3rem;
   display: block;
 }
@@ -658,45 +650,36 @@ a:hover {
 }
 
 .deco-card {
-  --deco-bg: #15111c;
-  --deco-bg-2: #1d1627;
-  --deco-border: #e7d3a1;
-  --deco-text: #f3e6c6;
-  background: radial-gradient(circle at 100% 0%, var(--deco-bg-2), var(--deco-bg));
-  border: 1px solid var(--deco-border);
-  border-radius: 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   position: relative;
   overflow: visible;
 }
 
 .news-book-card.deco-card,
 .trending-card.deco-card {
-  padding: 0.75rem;
+  padding: 0;
 }
 
 .deco-card .trending-book-title {
-  color: var(--deco-text);
+  color: var(--bs-text);
 }
 
 .deco-card .trending-book-author {
-  color: rgba(243, 230, 198, 0.78);
+  color: var(--bs-muted);
 }
 
 .deco-card .trending-book-author:hover {
-  color: var(--deco-border);
+  color: var(--bs-accent);
 }
 
 .deco-card .trending-cover {
-  border-color: rgba(231, 211, 161, 0.35);
+  border-color: var(--bs-border);
 }
 
 .deco-card .deco-corner {
-  width: 0.5rem;
-  height: 0.5rem;
-  border: 1px solid var(--deco-border);
-  position: absolute;
-  z-index: 2;
-  pointer-events: none;
+  display: none;
 }
 
 .deco-card .deco-corner::after,
@@ -789,7 +772,7 @@ a:hover {
   justify-content: space-between;
   align-items: flex-end;
   margin-bottom: 1.5rem;
-  border-bottom: 2px solid var(--gray-200);
+  border-bottom: 1px solid var(--bs-border);
   padding-bottom: 0.75rem;
 }
 
@@ -800,7 +783,7 @@ a:hover {
   font-weight: 700;
   font-size: 1.1rem;
   letter-spacing: 0.1em;
-  color: #444;
+  color: var(--bs-text);
 }
 
 .trending-title span {
@@ -810,7 +793,7 @@ a:hover {
 .trending-view {
   border: none;
   background: none;
-  color: #666;
+  color: var(--bs-accent);
   font-size: 0.9rem;
   cursor: pointer;
 }
@@ -825,8 +808,8 @@ a:hover {
   height: 32px;
   border-radius: 50%;
   border: 1px solid var(--gray-300);
-  background: white;
-  color: var(--gray-700);
+  background: var(--bs-surface);
+  color: var(--bs-text);
   font-size: 1.1rem;
   cursor: pointer;
 }
@@ -922,7 +905,8 @@ a:hover {
   padding-top: 150%;
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--bs-border);
+  border-radius: 10px;
 }
 
 /* Mobile: Smaller cover images */
@@ -944,20 +928,20 @@ a:hover {
 .trending-book-title {
   font-weight: 600;
   margin: 0;
-  color: var(--gray-900);
+  color: var(--bs-text);
   font-size: 0.9rem;
   line-height: 1.3;
 }
 
 .trending-book-author {
   margin: 0;
-  color: #6b7280;
+  color: var(--bs-muted);
   font-size: 0.9rem;
   transition: color 0.2s ease;
 }
 
 .trending-book-author:hover {
-  color: var(--primary);
+  color: var(--bs-accent);
 }
 
 /* Mobile: Smaller text */
@@ -1434,12 +1418,9 @@ a:hover {
 }
 /* ====== GLOBAL BACKGROUND ====== */
 .home-page {
-  background-color: #0b0f19;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
-  background-size: 40px 40px;
-  color: #e5e7eb;
+  background-color: var(--bs-bg);
+  background-image: none;
+  color: var(--bs-text);
 }
 
  .author-page {

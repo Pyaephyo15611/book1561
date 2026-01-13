@@ -1,5 +1,5 @@
 /* Global background */
 html, body {
-  background-color: #f5f6f8;
+  background-color: var(--bs-bg);
 }
 

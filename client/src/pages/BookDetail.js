@@ -11,7 +11,6 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
-import { pdfjs } from 'react-pdf';
 import {
   ArrowLeft,
   Download,
@@ -20,13 +19,9 @@ import {
   Info,
   ChevronRight
 } from 'lucide-react';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
 import { getCoverImageUrl } from '../utils/coverImage';
 import { apiGet } from '../utils/apiConfig';
 import './BookDetail.css';
-
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const BookDetail = () => {
   const { id } = useParams();
@@ -36,7 +31,6 @@ const BookDetail = () => {
   const [recommendedBooks, setRecommendedBooks] = useState([]);
   const [recommendLoading, setRecommendLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [pdfParts, setPdfParts] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [newReview, setNewReview] = useState('');
@@ -95,19 +89,6 @@ const BookDetail = () => {
         const response = await apiGet(`/api/books/${id}`);
         setBook(response.data);
         await fetchRecommendedBooks(response.data?.category);
-
-        try {
-          const viewResponse = await apiGet(`/api/books/${id}/view`);
-          if (viewResponse.data?.isSplit && viewResponse.data?.parts) {
-            setPdfParts(viewResponse.data.parts);
-          } else if (response.data?.pdfParts && response.data.pdfParts.length > 0) {
-            setPdfParts(response.data.pdfParts);
-          }
-        } catch (e) {
-          if (response.data?.pdfParts && response.data.pdfParts.length > 0) {
-            setPdfParts(response.data.pdfParts);
-          }
-        }
       } catch (apiError) {
         try {
           const bookRef = doc(db, 'books', id);
@@ -116,9 +97,6 @@ const BookDetail = () => {
             const bookData = { id: bookSnap.id, ...bookSnap.data() };
             setBook(bookData);
             await fetchRecommendedBooks(bookData?.category);
-            if (bookData.pdfParts && bookData.pdfParts.length > 0) {
-              setPdfParts(bookData.pdfParts);
-            }
           }
         } catch (fsError) {
           throw apiError;
@@ -439,29 +417,23 @@ const BookDetail = () => {
             <span className="page-info">
               {book.title || 'Untitled'} · {book.author || 'Unknown Author'}
             </span>
-            {pdfParts && pdfParts.length > 0 ? (
-              <span className="page-info" style={{ fontSize: '0.9rem' }}>
-                {pdfParts.length} Part{pdfParts.length > 1 ? 's' : ''} Available
-              </span>
-            ) : (
-              <button
-                onClick={handleDownload}
-                className="action-btn"
-                disabled={downloading}
-              >
-                {downloading ? (
-                  <>
-                    <Loader className="spinning" size={16} />
-                    Downloading…
-                  </>
-                ) : (
-                  <>
-                    <Download size={16} />
-                    Download
-                  </>
-                )}
-              </button>
-            )}
+            <button
+              onClick={handleDownload}
+              className="action-btn"
+              disabled={downloading}
+            >
+              {downloading ? (
+                <>
+                  <Loader className="spinning" size={16} />
+                  Downloading…
+                </>
+              ) : (
+                <>
+                  <Download size={16} />
+                  Download
+                </>
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -612,23 +584,12 @@ const BookDetail = () => {
                   </>
                 )}
               </button>
-
-              {/* Conditionally restore Read Online when PDF exists */}
-              {(pdfParts?.length > 0 || book?.b2FileName || book?.fileName) && (
-                <button
-                  className="cta cta-outline"
-                  type="button"
-                  onClick={() => navigate(`/read/${id}`)}
-                >
-                  Read Online
-                </button>
-              )}
                           </div>
 
             <div className="availability-note">
               <Info size={16} />
               <p>
-                This book is available for free download in multiple formats including PDF and can also be read online using our built-in reader.
+                This book is available for free download in PDF format.
               </p>
             </div>
 
@@ -639,8 +600,6 @@ const BookDetail = () => {
             )}
           </div>
         </section>
-
-        {/* Online reading moved to /read/:id */}
 
         <section className="recommended-section">
           <div className="recommended-header">

@@ -25,6 +25,8 @@ import {
   FormatQuote as FormatQuoteIcon,
   Share as ShareIcon
 } from '@mui/icons-material';
+import { API_URL } from '../utils/apiConfig';
+import { getDefaultCoverImage } from '../utils/coverImage';
 
 function TabPanel({ children, value, index, ...other }) {
   return (
@@ -69,14 +71,14 @@ const BookDetail = () => {
     const fetchBook = async () => {
       try {
         // Fetch book details
-        const response = await fetch(`http://localhost:5000/api/books/${id}`);
+        const response = await fetch(`${API_URL}/api/books/${id}`);
         if (!response.ok) throw new Error('Book not found');
         const data = await response.json();
         setBook(data);
         
         // Fetch recommended books
         try {
-          const recommendedResponse = await fetch(`http://localhost:5000/api/books?limit=4&exclude=${id}`);
+          const recommendedResponse = await fetch(`${API_URL}/api/books?limit=4&exclude=${id}`);
           if (recommendedResponse.ok) {
             const recommendedData = await recommendedResponse.json();
             setRecommendedBooks(Array.isArray(recommendedData) ? recommendedData : []);
@@ -214,13 +216,12 @@ const BookDetail = () => {
           }}>
             <Box
               component="img"
-              src={book.coverImage || 'https://via.placeholder.com/300x450?text=No+Cover'}
+              src={book.coverImage || getDefaultCoverImage(book)}
               alt={book.title}
               sx={{ 
                 maxWidth: '100%',
-                maxHeight: '400px',
-                objectFit: 'contain',
-                borderRadius: 1,
+                height: 'auto',
+                borderRadius: 2,
                 boxShadow: 3
               }}
             />
@@ -354,14 +355,13 @@ const BookDetail = () => {
               >
                 <Box
                   component="img"
-                  src={recBook.coverImage || 'https://via.placeholder.com/200x300?text=No+Cover'}
+                  src={recBook.coverImage || getDefaultCoverImage(recBook)}
                   alt={recBook.title}
                   sx={{
                     width: '100%',
-                    height: '200px',
-                    objectFit: 'cover',
+                    height: 'auto',
                     borderRadius: 1,
-                    mb: 2
+                    mb: 1
                   }}
                 />
                 <Typography variant="subtitle1" noWrap>{recBook.title}</Typography>

@@ -878,7 +878,7 @@ app.get('/api/sections', async (req, res) => {
 
 app.post('/api/admin/sections', verifyAdminPassword, async (req, res) => {
   try {
-    const { title, route, keywords } = req.body || {};
+    const { title, route, keywords, layout } = req.body || {};
     if (!title || !String(title).trim()) {
       return res.status(400).json({ error: 'Title is required' });
     }
@@ -886,12 +886,15 @@ app.post('/api/admin/sections', verifyAdminPassword, async (req, res) => {
       return res.status(400).json({ error: 'Route is required' });
     }
 
+    const safeLayout = layout === 'grid' ? 'grid' : 'scroll';
+
     const sections = await getSections();
     const newSection = {
       id: `section_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       title: String(title).trim(),
       route: String(route).trim(),
-      keywords: normalizeKeywords(keywords)
+      keywords: normalizeKeywords(keywords),
+      layout: safeLayout
     };
     sections.push(newSection);
     await saveSections(sections);
@@ -904,18 +907,21 @@ app.post('/api/admin/sections', verifyAdminPassword, async (req, res) => {
 
 app.put('/api/admin/sections/:id', verifyAdminPassword, async (req, res) => {
   try {
-    const { title, route, keywords } = req.body || {};
+    const { title, route, keywords, layout } = req.body || {};
     const sections = await getSections();
     const index = sections.findIndex((s) => s.id === req.params.id);
     if (index === -1) {
       return res.status(404).json({ error: 'Section not found' });
     }
 
+    const safeLayout = layout === 'grid' ? 'grid' : layout === 'scroll' ? 'scroll' : (sections[index].layout || 'scroll');
+
     const updated = {
       ...sections[index],
       title: title !== undefined ? String(title).trim() : sections[index].title,
       route: route !== undefined ? String(route).trim() : sections[index].route,
-      keywords: keywords !== undefined ? normalizeKeywords(keywords) : (sections[index].keywords || [])
+      keywords: keywords !== undefined ? normalizeKeywords(keywords) : (sections[index].keywords || []),
+      layout: safeLayout
     };
 
     if (!updated.title) {
@@ -948,6 +954,75 @@ app.delete('/api/admin/sections/:id', verifyAdminPassword, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete section' });
   }
 });
+
+app.post(
+  '/api/admin/sections/:id/banner',
+  verifyAdminPassword,
+  upload.single('bannerImage'),
+  async (req, res) => {
+    try {
+      const sections = await getSections();
+      const index = sections.findIndex((s) => s.id === req.params.id);
+      if (index === -1) {
+        return res.status(404).json({ error: 'Section not found' });
+      }
+
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: 'bannerImage file is required' });
+      }
+
+      const safeOriginal = String(file.originalname || 'banner')
+        .replace(/[^a-zA-Z0-9._-]/g, '_')
+        .slice(0, 120);
+
+      let bannerUrl = null;
+      let bannerStorage = null;
+
+      if (hasCloudinaryCredentials) {
+        const section = sections[index];
+        const cloudinaryResult = await uploadBufferToCloudinary(file.buffer, {
+          folder: (process.env.CLOUDINARY_FOLDER || 'bookstore') + '/section-banners',
+          public_id: `section-banner-${section.id}`,
+          resource_type: 'image',
+          format: 'webp',
+          quality: 'auto:good',
+          width: 1600,
+          crop: 'limit',
+          timestamp: Math.floor((Date.now() + timeOffset) / 1000)
+        });
+        if (cloudinaryResult?.secure_url) {
+          bannerUrl = cloudinaryResult.secure_url;
+          bannerStorage = { provider: 'cloudinary', url: bannerUrl };
+        }
+      }
+
+      if (!bannerUrl) {
+        const uploadsDir = path.join(__dirname, 'uploads');
+        await fs.mkdir(uploadsDir, { recursive: true });
+        const fileName = `section-banner-${req.params.id}-${Date.now()}-${safeOriginal}`;
+        await fs.writeFile(path.join(uploadsDir, fileName), file.buffer);
+        const protocol = getProtocol(req);
+        bannerUrl = `${protocol}://${req.get('host')}/uploads/${encodeURIComponent(fileName)}`;
+        bannerStorage = { provider: 'local', url: bannerUrl };
+      }
+
+      const updated = {
+        ...sections[index],
+        bannerImage: bannerUrl,
+        bannerImageUrl: bannerUrl,
+        bannerStorage
+      };
+
+      sections[index] = updated;
+      await saveSections(sections);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error uploading section banner:', error);
+      res.status(500).json({ error: error.message || 'Failed to upload section banner' });
+    }
+  }
+);
 
 // Serve cover image - Moved to later in the file (around line 1500) to use proxy logic
 // app.get('/api/books/:id/cover', ...);

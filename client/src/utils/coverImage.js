@@ -38,6 +38,9 @@ export function getCoverImageUrl(book) {
   
   // If it's already a full URL (http/https), use it as is
   if (coverImage.startsWith('http://') || coverImage.startsWith('https://')) {
+    if (coverImage.includes('via.placeholder.com')) {
+      return null;
+    }
     return coverImage;
   }
   

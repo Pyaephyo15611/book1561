@@ -6,22 +6,19 @@ import { collection, getDocs } from 'firebase/firestore/lite';
 import { db } from '../firebase/config';
 import { API_URL, apiGet } from '../utils/apiConfig';
 import {
-  BookOpen,
   Facebook,
   Instagram,
   Twitter,
   Youtube
 } from 'lucide-react';
-import { getCoverImageUrl, getDefaultCoverImage } from '../utils/coverImage';
 import CategorySection from '../components/CategorySection';
-import BookSkeleton from '../components/BookSkeleton';
 import './Home.css';
 import bannerLogo from '../assets/logo.png';
 
 console.log('API_URL configured as:', API_URL);
 
 const Home = () => {
-  const navigate = useNavigate();
+  useNavigate();
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +75,6 @@ const Home = () => {
     }
   ];
   const [categorySections, setCategorySections] = useState(defaultCategorySections);
-  const newsBooksScrollRef = useRef(null);
   const lastFetchAtRef = useRef(0);
 
   const fetchBooks = useCallback(async () => {
@@ -199,6 +195,7 @@ const Home = () => {
             .map((s) => ({
               title: String(s.title || '').trim(),
               route: String(s.route || '').trim(),
+              layout: s?.layout === 'grid' ? 'grid' : 'scroll',
               keywords: Array.isArray(s.keywords)
                 ? s.keywords
                 : typeof s.keywords === 'string'
@@ -306,7 +303,7 @@ const Home = () => {
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => window.scrollTo({ top: document.querySelector('.news-books')?.offsetTop - 90, behavior: 'smooth' })}
+                onClick={() => window.scrollTo({ top: document.querySelector('.trending-books')?.offsetTop - 90, behavior: 'smooth' })}
               >
                 စာအုပ်တွေကို ကြည့်မယ်
               </button>
@@ -329,105 +326,6 @@ const Home = () => {
         </header>
 
       <main className="main-content">
-        {/* News Books Section with horizontal scroll */}
-        <section className="section news-books">
-          <div className="container">
-            <div className="trending-header">
-              <div className="trending-title">
-                <span>စာအုပ်အသစ်များ</span>
-                <button
-                  type="button"
-                  className="trending-view"
-                  onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}
-                >
-                  (အားလုံးကြည့်မယ်)
-                </button>
-              </div>
-              <div className="trending-nav">
-                <button
-                  className="trend-arrow"
-                  type="button"
-                  aria-label="Scroll left"
-                  onClick={() => {
-                    if (newsBooksScrollRef.current) {
-                      newsBooksScrollRef.current.scrollBy({ left: -300, behavior: 'smooth' });
-                    }
-                  }}
-                >
-                  ‹
-                </button>
-                <button
-                  className="trend-arrow"
-                  type="button"
-                  aria-label="Scroll right"
-                  onClick={() => {
-                    if (newsBooksScrollRef.current) {
-                      newsBooksScrollRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-                    }
-                  }}
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-
-            {displayBooks.length === 0 ? (
-              loading ? (
-                <div className="news-books-scroll" ref={newsBooksScrollRef}>
-                  <div className="news-books-container">
-                    {Array.from({ length: 8 }).map((_, index) => (
-                      <BookSkeleton key={index} />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="no-results">
-                  <BookOpen size={48} />
-                  <h3>No books found</h3>
-                  <p>Try a different search term or clear the search box.</p>
-                </div>
-              )
-            ) : (
-              <div className="news-books-scroll" ref={newsBooksScrollRef}>
-                <div className="news-books-container">
-                  {displayBooks
-                    .slice(0, 8)
-                    .filter((book) => book && book.id)
-                    .map((book, index) => (
-                    <motion.div
-                      key={book.id}
-                      className="news-book-card deco-card"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      onClick={() => navigate(`/book/${book.id}`)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div className="deco-corner deco-top deco-left"></div>
-                      <div className="deco-corner deco-top deco-right"></div>
-                      <div className="deco-corner deco-bottom deco-left"></div>
-                      <div className="deco-corner deco-bottom deco-right"></div>
-                      <div className="trending-cover">
-                        <img
-                          src={getCoverImageUrl(book)}
-                          alt={book.title}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = getDefaultCoverImage(book);
-                          }}
-                          loading="lazy"
-                        />
-                      </div>
-                      <p className="trending-book-title">{book.title || 'Untitled'}</p>
-                      <p className="trending-book-author">{book.author || 'Unknown Author'}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
         {/* Category Sections - Show filtered results when searching */}
         <>
           {categorySections.map((category) => {
@@ -454,6 +352,7 @@ const Home = () => {
                 title={category.title}
                 books={categoryBooks}
                 categoryRoute={category.route}
+                layout={category.layout}
                 loading={loading}
               />
             );
