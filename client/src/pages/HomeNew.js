@@ -88,7 +88,7 @@ const Home = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('recent');
   const [currentPage, setCurrentPage] = useState(1);
-  const [booksPerPage] = useState(12);
+  const [booksPerPage] = useState(8);
   const [readingProgress, setReadingProgress] = useState({});
   const [savedBooks, setSavedBooks] = useState(new Set());
   const searchInputRef = useRef(null);

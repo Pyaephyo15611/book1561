@@ -605,11 +605,19 @@ const BookDetail = () => {
           <div className="recommended-header">
             <h3>Recommended Books</h3>
             {!recommendLoading && (
-              <button className="view-all-link" onClick={() => navigate('/')}>
-                Browse library <ChevronRight size={16} />
-                  </button>
-                )}
-              </div>
+              <button
+                className="view-all-link"
+                onClick={() =>
+                  book?.category
+                    ? navigate(`/category/${encodeURIComponent(book.category)}`)
+                    : navigate('/')
+                }
+              >
+                အားလုံးကြည့်မယ်{' '}
+                <ChevronRight size={16} />
+              </button>
+            )}
+          </div>
           {recommendLoading ? (
             <div className="recommended-loading">
               <Loader className="spinning" size={28} />

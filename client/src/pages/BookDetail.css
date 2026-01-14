@@ -790,6 +790,24 @@
   gap: 1.5rem;
 }
 
+@media (max-width: 768px) {
+  .recommended-grid {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    gap: 12px;
+    padding: 0.25rem 0 0.75rem;
+    scroll-snap-type: x mandatory;
+  }
+
+  .recommended-card {
+    flex: 0 0 calc((100% - 24px) / 2.5);
+    max-width: calc((100% - 24px) / 2.5);
+    scroll-snap-align: start;
+  }
+}
+
 .recommended-card {
   cursor: pointer;
   display: flex;

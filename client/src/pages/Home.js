@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { collection, getDocs } from 'firebase/firestore/lite';
 import { db } from '../firebase/config';
@@ -18,7 +17,6 @@ import bannerLogo from '../assets/logo.png';
 console.log('API_URL configured as:', API_URL);
 
 const Home = () => {
-  useNavigate();
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -241,7 +239,7 @@ const Home = () => {
   const homepageStructuredData = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "name": "BookStore",
+    "name": "Digitalcomic.site",
     "url": siteUrl,
     "description": "Free online bookstore with thousands of ebooks. Read and download books online.",
     "potentialAction": {
@@ -254,7 +252,7 @@ const Home = () => {
   return (
     <>
       <Helmet>
-        <title>BookStore - Free Ebooks Online | Read & Download Books</title>
+        <title>Digitalcomic.site</title>
         <meta name="description" content="Discover thousands of free ebooks and digital books. Read online or download instantly. Browse fiction, non-fiction, literature, and more." />
         <meta name="keywords" content="free ebooks, online books, digital books, read books online, download books, bookstore, literature, fiction, non-fiction" />
         <link rel="canonical" href={siteUrl} />
@@ -262,12 +260,12 @@ const Home = () => {
         {/* Open Graph */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content={siteUrl} />
-        <meta property="og:title" content="BookStore - Free Ebooks Online" />
+        <meta property="og:title" content="Digitalcomic.site" />
         <meta property="og:description" content="Discover thousands of free ebooks and digital books. Read online or download instantly." />
         
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="BookStore - Free Ebooks Online" />
+        <meta name="twitter:title" content="Digitalcomic.site" />
         <meta name="twitter:description" content="Discover thousands of free ebooks and digital books." />
         
         {/* Structured Data */}

@@ -816,8 +816,14 @@ a:hover {
 
 .trending-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1.75rem;
+}
+
+@media (max-width: 1023px) {
+  .trending-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 /* Mobile: 3 columns with smaller books */
@@ -990,7 +996,7 @@ a:hover {
 /* Books Grid */
 .books-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 2rem;
 }
 
@@ -1001,8 +1007,8 @@ a:hover {
   overflow: hidden;
   box-shadow: var(--shadow);
   transition: var(--transition);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 110px 1fr;
 }
 
 .book-card:hover {
@@ -1012,7 +1018,7 @@ a:hover {
 
 .book-cover {
   position: relative;
-  padding-top: 150%;
+  height: 160px;
   background: var(--gray-100);
   overflow: hidden;
 }
@@ -1045,8 +1051,7 @@ a:hover {
 }
 
 .book-details {
-  padding: 1.25rem;
-  flex: 1;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
 }
@@ -1265,8 +1270,26 @@ a:hover {
   }
   
   .books-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
+  }
+
+  .book-card {
+    grid-template-columns: 90px 1fr;
+  }
+
+  .book-cover {
+    height: 130px;
+  }
+
+  .book-details {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .books-grid {
+    grid-template-columns: 1fr;
   }
 }
 

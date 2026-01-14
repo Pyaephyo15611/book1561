@@ -11,6 +11,7 @@ const CategorySection = ({ title, books, categoryRoute, loading, layout = 'scrol
   const scrollRef = useRef(null);
 
   const isGrid = layout === 'grid';
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
 
   const scrollByAmount = (direction) => {
     const el = scrollRef.current;
@@ -21,15 +22,22 @@ const CategorySection = ({ title, books, categoryRoute, loading, layout = 'scrol
 
   // Always show section, even if empty
   return (
-    <section className="section trending-books">
+    <section className={`section trending-books ${isGrid ? 'is-grid' : 'is-scroll'}`}>
       <div className="container">
         <div className="trending-header">
-          <div className="trending-title">
+          <div
+            className="trending-title"
+            onClick={() => navigate(`/category/${encodeURIComponent(categoryRoute)}`)}
+            style={{ cursor: 'pointer' }}
+          >
             <span>{title}</span>
             <button
               type="button"
               className="trending-view"
-              onClick={() => navigate(`/category/${encodeURIComponent(categoryRoute)}`)}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/category/${encodeURIComponent(categoryRoute)}`);
+              }}
             >
               (အားလုံးကြည့်မယ်)
             </button>
@@ -61,7 +69,7 @@ const CategorySection = ({ title, books, categoryRoute, loading, layout = 'scrol
         {loading ? (
           isGrid ? (
             <div className="trending-grid">
-              {Array.from({ length: window.innerWidth <= 480 ? 6 : 10 }).map((_, index) => (
+              {Array.from({ length: 8 }).map((_, index) => (
                 <BookSkeleton key={index} />
               ))}
             </div>
@@ -77,14 +85,18 @@ const CategorySection = ({ title, books, categoryRoute, loading, layout = 'scrol
         ) : books.length > 0 ? (
           isGrid ? (
             <div className="trending-grid">
-              {books.map((book, index) => (
+              {books.slice(0, 8).map((book, index) => (
                 <motion.div
                   key={book.id || index}
                   className="trending-card deco-card"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
-                  onClick={() => navigate(`/book/${book.id}`)}
+                  onClick={() =>
+                    isMobile
+                      ? navigate(`/category/${encodeURIComponent(categoryRoute)}`)
+                      : navigate(`/book/${book.id}`)
+                  }
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="deco-corner deco-top deco-left"></div>
@@ -103,19 +115,25 @@ const CategorySection = ({ title, books, categoryRoute, loading, layout = 'scrol
                       />
                     ) : null}
                   </div>
-                  <p className="trending-book-title">{book.title || 'Untitled'}</p>
-                  <p
-                    className="trending-book-author"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (book.author) {
-                        navigate(`/author/${encodeURIComponent(book.author)}`);
-                      }
-                    }}
-                    style={{ cursor: book.author ? 'pointer' : 'default' }}
-                  >
-                    {book.author || 'Unknown Author'}
-                  </p>
+                  <div className="trending-info">
+                    <p className="trending-book-title">{book.title || 'Untitled'}</p>
+                    <p
+                      className="trending-book-author"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isMobile) {
+                          navigate(`/category/${encodeURIComponent(categoryRoute)}`);
+                          return;
+                        }
+                        if (book.author) {
+                          navigate(`/author/${encodeURIComponent(book.author)}`);
+                        }
+                      }}
+                      style={{ cursor: book.author ? 'pointer' : 'default' }}
+                    >
+                      {book.author || 'Unknown Author'}
+                    </p>
+                  </div>
                 </motion.div>
               ))}
             </div>

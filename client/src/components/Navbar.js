@@ -101,7 +101,8 @@ const Navbar = ({ user }) => {
     <nav className="navbar">
       <div className="navbar-container">
         <Link to="/" className="navbar-logo" onClick={() => setMobileMenuOpen(false)}>
-          <img src={logo} alt="BookStore logo" className="navbar-logo-img" />
+          <img src={logo} alt="Digitalcomic.site logo" className="navbar-logo-img" />
+          <span className="navbar-logo-text">Digitalcomic.site</span>
         </Link>
 
         <div className="navbar-search">
