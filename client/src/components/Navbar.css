@@ -256,6 +256,49 @@
   gap: 0.25rem;
 }
 
+.navbar-user-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.navbar-user-trigger {
+  padding: 0.55rem 0.7rem;
+}
+
+.navbar-user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 160px;
+  background: var(--bs-surface);
+  border: 1px solid var(--bs-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(31, 26, 20, 0.12);
+  padding: 0.35rem;
+  z-index: 10003;
+}
+
+.navbar-user-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--bs-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.navbar-user-item:hover {
+  background: rgba(123, 45, 47, 0.08);
+  border-color: rgba(123, 45, 47, 0.25);
+}
+
 .amazon-search-close {
   display: none;
   border: none;

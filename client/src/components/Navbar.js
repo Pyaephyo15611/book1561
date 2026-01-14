@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
-import { LogOut, Menu, Search as SearchIcon, X } from 'lucide-react';
+import { LogOut, Search as SearchIcon, User, X } from 'lucide-react';
 import './Navbar.css';
 import logo from '../assets/logo3.png';
 import { apiGet } from '../utils/apiConfig';
@@ -11,27 +11,38 @@ const Navbar = ({ user }) => {
   const navigate = useNavigate();
   const desktopSearchInputRef = useRef(null);
   const mobileSearchInputRef = useRef(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
   const [books, setBooks] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     const shouldSignOut = window.confirm('Sign out of your account?');
     if (!shouldSignOut) return;
     try {
       await signOut(auth);
-      setMobileMenuOpen(false);
+      setUserMenuOpen(false);
     } catch (error) {
       console.error('Error signing out:', error);
       alert('Sign out failed. Please try again.');
     }
   };
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!userMenuRef.current) return;
+      if (!userMenuRef.current.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const toggleMobileSearch = () => {
     const next = !mobileSearchOpen;
@@ -92,7 +103,6 @@ const Navbar = ({ user }) => {
     const term = searchTerm.trim();
     if (!term) return;
     setIsSearchOpen(false);
-    setMobileMenuOpen(false);
     setMobileSearchOpen(false);
     navigate(`/search/${encodeURIComponent(term)}`);
   };
@@ -100,7 +110,7 @@ const Navbar = ({ user }) => {
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <Link to="/" className="navbar-logo" onClick={() => setMobileMenuOpen(false)}>
+        <Link to="/" className="navbar-logo">
           <img src={logo} alt="Digitalcomic.site logo" className="navbar-logo-img" />
           <span className="navbar-logo-text">Digitalcomic.site</span>
         </Link>
@@ -169,7 +179,6 @@ const Navbar = ({ user }) => {
                   onClick={() => {
                     setIsSearchOpen(false);
                     setSearchTerm('');
-                    setMobileMenuOpen(false);
                     setMobileSearchOpen(false);
                     navigate(`/book/${b.id}`);
                   }}
@@ -194,29 +203,33 @@ const Navbar = ({ user }) => {
             {mobileSearchOpen ? <X size={22} /> : <SearchIcon size={22} />}
           </button>
 
-          <button className="mobile-menu-toggle" onClick={toggleMobileMenu} aria-label="Toggle menu">
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-        <div className={`navbar-menu ${mobileMenuOpen ? 'open' : ''}`}>
-          <Link to="/authors" className="navbar-link" onClick={() => setMobileMenuOpen(false)}>
-            Authors
-          </Link>
-          <Link to="/admin" className="navbar-link" onClick={() => setMobileMenuOpen(false)}>
-            Admin
-          </Link>
           {user ? (
-            <>
-              <span className="navbar-user">
-                {user.displayName || user.email?.split('@')[0] || 'User'}
-              </span>
-              <button onClick={handleSignOut} className="navbar-button">
-                <LogOut size={18} />
-                <span>Sign Out</span>
+            <div className="navbar-user-menu" ref={userMenuRef}>
+              <button
+                type="button"
+                className="navbar-button navbar-user-trigger"
+                onClick={() => setUserMenuOpen((v) => !v)}
+                aria-label="User menu"
+              >
+                <User size={20} />
               </button>
-            </>
+
+              {userMenuOpen ? (
+                <div className="navbar-user-dropdown" role="menu" aria-label="User menu">
+                  <button
+                    type="button"
+                    className="navbar-user-item"
+                    onClick={handleSignOut}
+                    role="menuitem"
+                  >
+                    <LogOut size={18} />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              ) : null}
+            </div>
           ) : (
-            <Link to="/login" className="navbar-button" onClick={() => setMobileMenuOpen(false)}>
+            <Link to="/login" className="navbar-button navbar-auth-button">
               Sign In
             </Link>
           )}
@@ -266,7 +279,6 @@ const Navbar = ({ user }) => {
                 onClick={() => {
                   setIsSearchOpen(false);
                   setSearchTerm('');
-                  setMobileMenuOpen(false);
                   setMobileSearchOpen(false);
                   navigate(`/book/${b.id}`);
                 }}

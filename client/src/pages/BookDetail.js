@@ -20,7 +20,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { getCoverImageUrl } from '../utils/coverImage';
-import { apiGet } from '../utils/apiConfig';
+import { apiGet, API_URL, RENDER_FALLBACK_BASE } from '../utils/apiConfig';
 import './BookDetail.css';
 
 const BookDetail = () => {
@@ -33,11 +33,13 @@ const BookDetail = () => {
   const [downloading, setDownloading] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsEnabled, setReviewsEnabled] = useState(true);
   const [newReview, setNewReview] = useState('');
   const [rating, setRating] = useState(0);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [replies, setReplies] = useState([]);
   const [repliesLoading, setRepliesLoading] = useState(true);
+  const [repliesEnabled, setRepliesEnabled] = useState(true);
   const [replyText, setReplyText] = useState({});
   const [submittingReply, setSubmittingReply] = useState({});
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
@@ -120,6 +122,11 @@ const BookDetail = () => {
 
   useEffect(() => {
     if (!id) return;
+    if (!reviewsEnabled) {
+      setReviews([]);
+      setReviewsLoading(false);
+      return;
+    }
 
     const reviewsQuery = query(collection(db, 'reviews'), where('bookId', '==', id));
 
@@ -157,6 +164,8 @@ const BookDetail = () => {
         // Handle permission errors gracefully
         if (error.code === 'permission-denied') {
           console.warn('Firestore permissions not configured - reviews disabled');
+          setReviewsEnabled(false);
+          unsubscribe();
         }
         setReviews([]);
         setReviewsLoading(false);
@@ -164,11 +173,16 @@ const BookDetail = () => {
     );
 
     return () => unsubscribe();
-  }, [id]);
+  }, [id, reviewsEnabled]);
 
   // Load replies for all reviews of this book
   useEffect(() => {
     if (!id) return;
+    if (!repliesEnabled) {
+      setReplies([]);
+      setRepliesLoading(false);
+      return;
+    }
 
     const repliesQuery = query(
       collection(db, 'reviewReplies'),
@@ -196,6 +210,8 @@ const BookDetail = () => {
         // Handle permission errors gracefully
         if (error.code === 'permission-denied') {
           console.warn('Firestore permissions not configured - replies disabled');
+          setRepliesEnabled(false);
+          unsubscribe();
         }
         setReplies([]);
         setRepliesLoading(false);
@@ -203,57 +219,36 @@ const BookDetail = () => {
     );
 
     return () => unsubscribe();
-  }, [id]);
+  }, [id, repliesEnabled]);
 
   // PDF is now handled on /read/:id page
 
   const handleDownload = async () => {
+    if (!auth.currentUser) {
+      alert('You need to sign in to download.');
+      navigate(`/login?reason=download&redirect=${encodeURIComponent(`/book/${id}`)}`);
+      return;
+    }
+
     const shouldDownload = window.confirm('Download this book?');
     if (!shouldDownload) return;
-    
+
+    const hasWholePdf = !!(book && (book.b2FileName || book.fileName));
+    if (!hasWholePdf) {
+      alert('Download not available for this book. Please upload the full PDF in Admin.');
+      return;
+    }
+
+    const base = (API_URL && API_URL.trim()) ? API_URL.trim() : RENDER_FALLBACK_BASE;
+    const downloadUrl = `${String(base || '').replace(/\/$/, '')}/api/books/${id}/download`;
+
     setDownloading(true);
     try {
-      const response = await apiGet(`/api/books/${id}/download`, { responseType: 'blob' });
-
-      // Get filename and content type from headers
-      let filename = 'book.pdf';
-      let contentType = 'application/pdf';
-      
-      const contentDisposition = response.headers['content-disposition'];
-      const contentTypeHeader = response.headers['content-type'];
-      
-      if (contentTypeHeader) {
-        contentType = contentTypeHeader;
-      }
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
-          // Decode URI component if needed
-          try {
-            filename = decodeURIComponent(filename);
-          } catch (e) {
-            // If decoding fails, use as is
-          }
-        }
-      }
-
-      // Create a blob URL and trigger download
-      const blob = new Blob([response.data], { type: contentType });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading book:', error);
-      alert('Failed to download book. Please try again.');
+      // Use the browser to handle the download stream (avoids Axios timeouts and huge memory usage).
+      window.location.assign(downloadUrl);
     } finally {
-      setDownloading(false);
+      // Allow the UI to re-enable quickly; the browser download continues independently.
+      window.setTimeout(() => setDownloading(false), 750);
     }
   };
 
