@@ -980,6 +980,91 @@ app.put('/api/admin/settings/telegram', verifyAdminPassword, async (req, res) =>
   }
 });
 
+function normalizeSectionText(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+function normalizeSectionLoose(value) {
+  return normalizeSectionText(value).replace(/\s+/g, '');
+}
+
+function matchBookToSectionServer(book, section) {
+  const bookCat = normalizeSectionText(book?.category);
+  const bookCatLoose = normalizeSectionLoose(book?.category);
+  const route = normalizeSectionText(section?.route);
+  const routeLoose = normalizeSectionLoose(section?.route);
+  const title = normalizeSectionText(section?.title);
+  const titleLoose = normalizeSectionLoose(section?.title);
+
+  if (!bookCat) return false;
+
+  if (bookCat === route || bookCat === title) return true;
+  if (route && (bookCat.includes(route) || route.includes(bookCat))) return true;
+  if (title && (bookCat.includes(title) || title.includes(bookCat))) return true;
+
+  if (bookCatLoose && (bookCatLoose === routeLoose || bookCatLoose === titleLoose)) return true;
+  if (routeLoose && (bookCatLoose.includes(routeLoose) || routeLoose.includes(bookCatLoose))) return true;
+  if (titleLoose && (bookCatLoose.includes(titleLoose) || titleLoose.includes(bookCatLoose))) return true;
+
+  const keywords = Array.isArray(section?.keywords) ? section.keywords : [];
+  const matchedKeyword = keywords.some((k) => {
+    const key = normalizeSectionText(k);
+    const keyLoose = normalizeSectionLoose(k);
+    if (!key) return false;
+    if (bookCat.includes(key) || key.includes(bookCat)) return true;
+    if (bookCatLoose && keyLoose && (bookCatLoose.includes(keyLoose) || keyLoose.includes(bookCatLoose))) return true;
+    return false;
+  });
+  return matchedKeyword;
+}
+
+app.get('/api/sections/books', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const route = typeof req.query.route === 'string' ? req.query.route : '';
+    const title = typeof req.query.title === 'string' ? req.query.title : '';
+    const keywordsRaw = typeof req.query.keywords === 'string' ? req.query.keywords : '';
+    const limitRaw = typeof req.query.limit === 'string' ? req.query.limit : '';
+    const limit = Math.max(1, Math.min(100, parseInt(limitRaw || '20', 10) || 20));
+
+    const section = {
+      route,
+      title,
+      keywords: keywordsRaw
+        ? keywordsRaw
+            .split(',')
+            .map((k) => String(k || '').trim())
+            .filter(Boolean)
+        : []
+    };
+
+    if (!section.route && !section.title && section.keywords.length === 0) {
+      return res.status(400).json({ error: 'route/title/keywords is required' });
+    }
+
+    const books = await getBooks();
+    const matched = (Array.isArray(books) ? books : []).filter((b) => matchBookToSectionServer(b, section));
+
+    matched.sort((a, b) => {
+      if (a?.createdAt && b?.createdAt) {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      }
+      if (a?.id && b?.id) {
+        return String(b.id).localeCompare(String(a.id));
+      }
+      return 0;
+    });
+
+    res.json(matched.slice(0, limit));
+  } catch (error) {
+    console.error('Error fetching section books:', error);
+    res.status(500).json({ error: 'Failed to fetch section books' });
+  }
+});
+
 app.get('/api/sections', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

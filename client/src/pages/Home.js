@@ -15,9 +15,7 @@ import bannerLogo from '../assets/logo.png';
 console.log('API_URL configured as:', API_URL);
 
 const Home = () => {
-  const [books, setBooks] = useState([]);
-  const [filteredBooks, setFilteredBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false);
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const defaultCategorySections = [
     {
@@ -72,94 +70,45 @@ const Home = () => {
     }
   ];
   const [categorySections, setCategorySections] = useState(defaultCategorySections);
-  const lastFetchAtRef = useRef(0);
+  const [sectionBooksByKey, setSectionBooksByKey] = useState({});
+  const [sectionLoadingByKey, setSectionLoadingByKey] = useState({});
+  const [sectionErrorByKey, setSectionErrorByKey] = useState({});
+  const sectionFetchedRef = useRef({});
+  const sectionObserverRef = useRef(null);
+  const sectionNodeByKeyRef = useRef({});
 
-  const fetchBooks = useCallback(async () => {
+  const fetchSectionBooks = useCallback(async (section) => {
+    const key = section?.route || section?.title;
+    if (!key) return;
+    if (sectionFetchedRef.current[key]) return;
+
+    sectionFetchedRef.current[key] = true;
+    setSectionLoadingByKey((prev) => ({ ...prev, [key]: true }));
+    setSectionErrorByKey((prev) => ({ ...prev, [key]: '' }));
+
     try {
-      lastFetchAtRef.current = Date.now();
-      let booksData = [];
-
-      try {
-        console.log('Fetching books from API...');
-        const response = await apiGet('/api/books', {
-          headers: { 'Accept': 'application/json' }
-        });
-        booksData = Array.isArray(response.data) ? response.data : [];
-        console.log('API fetch successful, got', booksData.length, 'books');
-      } catch (apiError) {
-        console.error('API fetch failed (books are stored in server/books.json):', apiError.message || apiError);
-      }
-
-      if (booksData.length === 0) {
-        console.warn('No books found from any source');
-      }
-
-      const enhancedBooks = booksData.map((book) => ({
-        ...book,
-        rating: book.rating || (Math.random() * 2 + 3).toFixed(1),
-        pages: book.pages || book.pageCount || Math.floor(Math.random() * 200) + 150,
-        readingTime: book.readingTime || `${Math.floor((book.pages || 200) / 2)} min read`
-      }));
-
-      // Sort books by creation date (newest first) or by ID if no date available
-      const sortedBooks = enhancedBooks.sort((a, b) => {
-        // Try to sort by createdAt timestamp first
-        if (a.createdAt && b.createdAt) {
-          return new Date(b.createdAt) - new Date(a.createdAt);
+      const keywords = Array.isArray(section?.keywords) ? section.keywords : [];
+      const limit = section?.layout === 'grid' ? 8 : 24;
+      const resp = await apiGet('/api/sections/books', {
+        params: {
+          route: section?.route || '',
+          title: section?.title || '',
+          keywords: keywords.join(','),
+          limit,
+          _ts: Date.now()
         }
-        // Fallback to sorting by ID (assuming newer IDs are larger)
-        if (a.id && b.id) {
-          return b.id.localeCompare(a.id);
-        }
-        // Final fallback to maintain original order
-        return 0;
       });
 
-      setBooks(sortedBooks);
-      setFilteredBooks(sortedBooks);
-
-      try {
-        localStorage.setItem('books_cache_v1', JSON.stringify(enhancedBooks));
-      } catch (e) {
-        console.warn('Failed to cache books:', e.message);
-      }
-    } catch (error) {
-      console.error('Error fetching books:', error);
-      setBooks([]);
-      setFilteredBooks([]);
+      const data = Array.isArray(resp.data) ? resp.data : [];
+      setSectionBooksByKey((prev) => ({ ...prev, [key]: data }));
+    } catch (e) {
+      sectionFetchedRef.current[key] = false;
+      setSectionErrorByKey((prev) => ({ ...prev, [key]: e?.message || 'Failed to load section books' }));
+      setSectionBooksByKey((prev) => ({ ...prev, [key]: [] }));
     } finally {
-      setLoading(false);
+      setSectionLoadingByKey((prev) => ({ ...prev, [key]: false }));
     }
   }, []);
-
-  useEffect(() => {
-    try {
-      const cached = localStorage.getItem('books_cache_v1');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setBooks(parsed);
-          setFilteredBooks(parsed);
-          setLoading(false);
-        }
-      }
-    } catch (e) {
-      // ignore cache parse errors
-    }
-
-    fetchBooks();
-
-    const handleFocus = () => {
-      const now = Date.now();
-      if (now - lastFetchAtRef.current < 10000) {
-        return;
-      }
-      fetchBooks();
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [fetchBooks]);
 
   useEffect(() => {
     const fetchSections = async () => {
@@ -202,49 +151,40 @@ const Home = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [API_URL]);
 
-  const displayBooks = filteredBooks.length > 0 ? filteredBooks : books;
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
 
-  // Category mapping function to match books to categories
-  const normalizeCategory = (value) => {
-    return String(value || '')
-      .trim()
-      .replace(/\s+/g, ' ')
-      .toLowerCase();
-  };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const key = entry.target?.getAttribute('data-section-key');
+          if (!key) continue;
+          const section = categorySections.find((s) => (s?.route || s?.title) === key);
+          if (section) {
+            fetchSectionBooks(section);
+          }
+        }
+      },
+      { root: null, rootMargin: '200px 0px', threshold: 0.01 }
+    );
 
-  const normalizeLoose = (value) => {
-    return normalizeCategory(value).replace(/\s+/g, '');
-  };
-
-  const matchBookToSection = (book, section) => {
-    const bookCat = normalizeCategory(book?.category);
-    const bookCatLoose = normalizeLoose(book?.category);
-    const route = normalizeCategory(section?.route);
-    const routeLoose = normalizeLoose(section?.route);
-    const title = normalizeCategory(section?.title);
-    const titleLoose = normalizeLoose(section?.title);
-
-    if (!bookCat) return false;
-
-    if (bookCat === route || bookCat === title) return true;
-    if (route && (bookCat.includes(route) || route.includes(bookCat))) return true;
-    if (title && (bookCat.includes(title) || title.includes(bookCat))) return true;
-
-    if (bookCatLoose && (bookCatLoose === routeLoose || bookCatLoose === titleLoose)) return true;
-    if (routeLoose && (bookCatLoose.includes(routeLoose) || routeLoose.includes(bookCatLoose))) return true;
-    if (titleLoose && (bookCatLoose.includes(titleLoose) || titleLoose.includes(bookCatLoose))) return true;
-
-    const keywords = Array.isArray(section?.keywords) ? section.keywords : [];
-    const matchedKeyword = keywords.some((k) => {
-      const key = normalizeCategory(k);
-      const keyLoose = normalizeLoose(k);
-      if (!key) return false;
-      if (bookCat.includes(key) || key.includes(bookCat)) return true;
-      if (bookCatLoose && keyLoose && (bookCatLoose.includes(keyLoose) || keyLoose.includes(bookCatLoose))) return true;
-      return false;
+    sectionObserverRef.current = observer;
+    const nodes = Object.values(sectionNodeByKeyRef.current);
+    nodes.forEach((node) => {
+      if (node) observer.observe(node);
     });
-    return matchedKeyword;
-  };
+
+    return () => {
+      try {
+        observer.disconnect();
+      } catch {
+        // ignore
+      }
+    };
+  }, [categorySections, fetchSectionBooks]);
 
   // Structured Data for Homepage
   const homepageStructuredData = {
@@ -261,117 +201,147 @@ const Home = () => {
   };
 
   return (
-    <>
-      <Helmet>
-        <title>Digitalcomic.site</title>
-        <meta name="description" content="Discover thousands of free ebooks and digital books. Read online or download instantly. Browse fiction, non-fiction, literature, and more." />
-        <meta name="keywords" content="free ebooks, online books, digital books, read books online, download books, bookstore, literature, fiction, non-fiction" />
-        <link rel="canonical" href={siteUrl} />
-        
-        {/* Open Graph */}
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={siteUrl} />
-        <meta property="og:title" content="Digitalcomic.site" />
-        <meta property="og:description" content="Discover thousands of free ebooks and digital books. Read online or download instantly." />
-        
-        {/* Twitter */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Digitalcomic.site" />
-        <meta name="twitter:description" content="Discover thousands of free ebooks and digital books." />
+  <>
+    <Helmet>
+      <title>Digitalcomic.site</title>
+      <meta name="description" content="Discover thousands of free ebooks and digital books. Read online or download instantly. Browse fiction, non-fiction, literature, and more." />
+      <meta name="keywords" content="free ebooks, online books, digital books, read books online, download books, bookstore, literature, fiction, non-fiction" />
+      <link rel="canonical" href={siteUrl} />
+      
+      {/* Open Graph */}
+      <meta property="og:type" content="website" />
+      <meta property="og:url" content={siteUrl} />
+      <meta property="og:title" content="Digitalcomic.site" />
+      <meta property="og:description" content="Discover thousands of free ebooks and digital books. Read online or download instantly." />
+      
+      {/* Twitter */}
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content="Digitalcomic.site" />
+      <meta name="twitter:description" content="Discover thousands of free ebooks and digital books." />
 
-        {/* Structured Data */}
-        <script type="application/ld+json">
-          {JSON.stringify(homepageStructuredData)}
-        </script>
-      </Helmet>
+      {/* Structured Data */}
+      <script type="application/ld+json">
+        {JSON.stringify(homepageStructuredData)}
+      </script>
+    </Helmet>
 
-      <div className="home-page">
-        {/* Manybooks-style hero */}
-        <header className="hero banner-hero">
-          <div className="hero-bg" aria-hidden="true">
-            <div className="hero-overlay"></div>
+    <div className="home-page">
+      {/* Manybooks-style hero */}
+      <header className="hero banner-hero">
+        <div className="hero-bg" aria-hidden="true">
+          <div className="hero-overlay"></div>
+        </div>
+        <div className="container banner-column">
+          <div className="banner-media">
+            <img
+              src={bannerLogo}
+              alt="Logo"
+              className="banner-image"
+            />
           </div>
-          <div className="container banner-column">
-            <div className="banner-media">
-              <img
-                src={bannerLogo}
-                alt="Logo"
-                className="banner-image"
-              />
-            </div>
-            <motion.div
-              className="banner-inner"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
+          <motion.div
+            className="banner-inner"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <h1 className="title-large">အခမဲ့ အီးဘုတ်တွေကို အလွယ်တကူ ဖတ်ရှုလိုက်ပါ</h1>
+            <p className="text-base font-normal">
+              စာအုပ်အမျိုးအစားစုံကို အွန်လိုင်းမှာ ဖတ်ရှုနိုင်သလို ဒေါင်းလုဒ်လည်း လုပ်နိုင်ပါတယ်။ မိမိနှစ်သက်ရာ စာအုပ်ကို ယနေ့ပဲ စတင်ရှာဖွေလိုက်ပါ။
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => window.scrollTo({ top: document.querySelector('.trending-books')?.offsetTop - 90, behavior: 'smooth' })}
             >
-              <h1 className="title-large">အခမဲ့ အီးဘုတ်တွေကို အလွယ်တကူ ဖတ်ရှုလိုက်ပါ</h1>
-              <p className="text-base font-normal">
-                စာအုပ်အမျိုးအစားစုံကို အွန်လိုင်းမှာ ဖတ်ရှုနိုင်သလို ဒေါင်းလုဒ်လည်း လုပ်နိုင်ပါတယ်။ မိမိနှစ်သက်ရာ စာအုပ်ကို ယနေ့ပဲ စတင်ရှာဖွေလိုက်ပါ။
-              </p>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => window.scrollTo({ top: document.querySelector('.trending-books')?.offsetTop - 90, behavior: 'smooth' })}
-              >
-                စာအုပ်တွေကို ကြည့်မယ်
-              </button>
-            </motion.div>
-            <div className="banner-social" aria-label="Social links">
-              <button type="button" className="banner-social-link" aria-label="Facebook">
-                <Facebook size={18} />
-              </button>
-              <button type="button" className="banner-social-link" aria-label="Instagram">
-                <Instagram size={18} />
-              </button>
-              <button type="button" className="banner-social-link" aria-label="Twitter">
-                <Twitter size={18} />
-              </button>
-              <button type="button" className="banner-social-link" aria-label="YouTube">
-                <Youtube size={18} />
-              </button>
-            </div>
+              စာအုပ်တွေကို ကြည့်မယ်
+            </button>
+          </motion.div>
+          <div className="banner-social" aria-label="Social links">
+            <button type="button" className="banner-social-link" aria-label="Facebook">
+              <Facebook size={18} />
+            </button>
+            <button type="button" className="banner-social-link" aria-label="Instagram">
+              <Instagram size={18} />
+            </button>
+            <button type="button" className="banner-social-link" aria-label="Twitter">
+              <Twitter size={18} />
+            </button>
+            <button type="button" className="banner-social-link" aria-label="YouTube">
+              <Youtube size={18} />
+            </button>
           </div>
-        </header>
+        </div>
+      </header>
 
-      <main className="main-content">
-        {/* Category Sections - Show filtered results when searching */}
-        <>
-          {categorySections.map((category) => {
-            const categoryBooks = displayBooks.filter((book) => {
-              return matchBookToSection(book, category);
-            });
-            
-            // Hide empty sections after loading.
-            // Keep visible during loading so skeletons can render.
-            if (!loading && categoryBooks.length === 0) {
-              return null;
-            }
+    <main className="main-content">
+      {/* Category Sections - Show filtered results when searching */}
+      <>
+        {categorySections.map((category) => {
+          const key = category.route || category.title;
+          const categoryBooks = key && Array.isArray(sectionBooksByKey[key]) ? sectionBooksByKey[key] : [];
+          const isSectionLoading = key ? Boolean(sectionLoadingByKey[key]) : false;
+          const sectionError = key ? String(sectionErrorByKey[key] || '') : '';
 
-            return (
+          // Hide empty sections after loading.
+          // Keep visible during loading so skeletons can render.
+          if (!isSectionLoading && !sectionError && categoryBooks.length === 0 && sectionFetchedRef.current[key]) {
+            return null;
+          }
+
+          return (
+            <div
+              key={key}
+              data-section-key={key}
+              ref={(node) => {
+                if (!key) return;
+
+                const prev = sectionNodeByKeyRef.current[key];
+                sectionNodeByKeyRef.current[key] = node;
+
+                const observer = sectionObserverRef.current;
+                if (!observer) return;
+
+                if (prev && prev !== node) {
+                  try {
+                    observer.unobserve(prev);
+                  } catch {
+                    // ignore
+                  }
+                }
+
+                if (node) {
+                  try {
+                    observer.observe(node);
+                  } catch {
+                    // ignore
+                  }
+                }
+              }}
+            >
               <CategorySection
-                key={category.route || category.title}
                 title={category.title}
                 books={categoryBooks}
                 categoryRoute={category.route}
                 layout={category.layout}
-                loading={loading}
+                loading={isSectionLoading || loading}
               />
-            );
-          })}
-        </>
+            </div>
+          );
+        })}
+      </>
 
-      </main>
+    </main>
 
-      <footer className="footer">
-        <div className="container">
-          <div className="footer-bottom">
-            <p>&copy; 2026 BookStore. မူပိုင်ခွင့်အားလုံး လုံခြုံပါသည်။</p>
-          </div>
+    <footer className="footer">
+      <div className="container">
+        <div className="footer-bottom">
+          <p>&copy; 2026 BookStore. မူပိုင်ခွင့်အားလုံး လုံခြုံပါသည်။</p>
         </div>
-      </footer>
-    </div>
-    </>
+      </div>
+    </footer>
+  </div>
+  </>
   );
 };
 
