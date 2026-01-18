@@ -437,7 +437,10 @@
 
 @media (max-width: 420px) {
   .navbar-logo-text {
-    display: none;
+    display: inline-block;
+    max-width: 9.5rem;
+    font-size: 0.85rem;
+    line-height: 1.1;
   }
 }
 
