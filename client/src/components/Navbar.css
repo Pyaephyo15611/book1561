@@ -353,6 +353,10 @@
     flex: 1;
   }
 
+  .navbar-actions {
+    flex-shrink: 0;
+  }
+
   .navbar-logo-text {
     font-size: 0.95rem;
     overflow: hidden;
@@ -428,6 +432,12 @@
 
   .navbar-menu.open {
     display: flex;
+  }
+}
+
+@media (max-width: 420px) {
+  .navbar-logo-text {
+    display: none;
   }
 }
 

@@ -341,12 +341,14 @@
   line-height: 1.2;
   margin: 0;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .book-author {
   font-size: 1.25rem;
   color: var(--text-secondary);
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .book-stats {
@@ -386,7 +388,7 @@
   cursor: pointer;
   font-size: 1rem;
   transition: var(--transition);
-  width: 100%;
+  width: auto;
 }
 
 .book-detail .cta-download {
@@ -404,7 +406,7 @@
   background-color: #0fb8ad;
   color: white;
   border-color: #0fb8ad;
-  width: 100%;
+  width: auto;
 }
 
 .cta-download:disabled {
@@ -1187,6 +1189,7 @@
 @media (max-width: 1024px) {
   .book-overview {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .cta-row {
@@ -1195,7 +1198,10 @@
 
   .cta-row .cta {
     width: 100%;
-    flex: 0 0 100%;
+  }
+
+  .book-main {
+    width: 100%;
   }
 
   .book-sidebar {
@@ -1215,17 +1221,42 @@
     padding: 2rem 0;
   }
   
+  .book-overview {
+    gap: 1.75rem;
+  }
+
+  .book-side-meta {
+    width: 100%;
+  }
+
+  .book-share {
+    width: 100%;
+  }
+
+  .share-icons {
+    flex-wrap: wrap;
+  }
+
+  .book-meta {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
   .book-title {
     font-size: 1.9rem;
+  }
+
+  .book-author {
+    font-size: 1.05rem;
+  }
+
+  .book-rating {
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
   }
   
   .cta-row {
     flex-direction: column;
-  }
-  
-  .cta {
-    width: 100%;
-    justify-content: center;
   }
   
   .pdf-viewer {
@@ -1246,7 +1277,48 @@
   .container {
     padding: 0 1rem;
   }
-  
+
+  .book-nav {
+    padding: 0.75rem 0;
+  }
+
+  .back-btn {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .book-sidebar {
+    max-width: 100%;
+  }
+
+  .book-cover-container {
+    width: min(220px, 70vw);
+  }
+
+  .cta {
+    padding: 0.75rem 1rem;
+  }
+
+  .recommended-card {
+    flex: 0 0 62%;
+    max-width: 62%;
+  }
+
+  .reviews-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .review-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .review-replies {
+    padding-left: 1rem;
+  }
+
   .book-stats {
     flex-direction: column;
     gap: 0.75rem;
