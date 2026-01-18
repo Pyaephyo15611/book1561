@@ -13,6 +13,7 @@ import Category from './pages/Category';
 import Search from './pages/Search';
 import AuthorList from './pages/AuthorList';
 import AuthorDetail from './pages/AuthorDetail';
+import { apiGet } from './utils/apiConfig';
 import './App.css';
 
 function App() {
@@ -22,35 +23,35 @@ function App() {
   const [telegramText, setTelegramText] = useState('Telegram ကို Join လုပ်ပါ');
 
   useEffect(() => {
-    const syncTelegramUrl = () => {
+    const syncTelegramSettings = async () => {
       try {
-        const saved = localStorage.getItem('app_settings_telegram_url');
-        if (saved && typeof saved === 'string') {
-          setTelegramUrl(saved);
+        const resp = await apiGet('/api/settings/telegram', {
+          params: { _ts: Date.now() }
+        });
+        const nextUrl = resp?.data?.telegramUrl;
+        const nextText = resp?.data?.telegramText;
+        if (typeof nextUrl === 'string' && nextUrl.trim()) {
+          setTelegramUrl(nextUrl.trim());
         }
-
-        const savedText = localStorage.getItem('app_settings_telegram_text');
-        if (savedText && typeof savedText === 'string') {
-          setTelegramText(savedText);
+        if (typeof nextText === 'string' && nextText.trim()) {
+          setTelegramText(nextText.trim());
         }
       } catch {
         // ignore
       }
     };
 
-    syncTelegramUrl();
+    syncTelegramSettings();
 
-    const handleStorage = (e) => {
-      if (e.key === 'app_settings_telegram_url') {
-        syncTelegramUrl();
-      }
+    const handleUpdated = () => {
+      syncTelegramSettings();
     };
 
-    window.addEventListener('storage', handleStorage);
-    window.addEventListener('telegramUrlUpdated', syncTelegramUrl);
+    window.addEventListener('telegramUrlUpdated', handleUpdated);
+    window.addEventListener('focus', handleUpdated);
     return () => {
-      window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('telegramUrlUpdated', syncTelegramUrl);
+      window.removeEventListener('telegramUrlUpdated', handleUpdated);
+      window.removeEventListener('focus', handleUpdated);
     };
   }, []);
 

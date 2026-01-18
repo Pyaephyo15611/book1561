@@ -95,6 +95,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 const BOOKS_FILE = path.join(__dirname, 'books.json');
 const BLOGS_FILE = path.join(__dirname, 'blogs.json');
 const SECTIONS_FILE = path.join(__dirname, 'sections.json');
+const SETTINGS_FILE = path.join(__dirname, 'settings.json');
 
 let booksCache = null;
 let booksCacheAtMs = 0;
@@ -117,6 +118,19 @@ async function initBlogsFile() {
   } catch {
     await fs.writeFile(BLOGS_FILE, JSON.stringify([], null, 2));
     console.log('📝 Created blogs.json file');
+  }
+}
+
+async function initSettingsFile() {
+  try {
+    await fs.access(SETTINGS_FILE);
+  } catch {
+    const defaults = {
+      telegramUrl: 'https://t.me/your_channel',
+      telegramText: 'Telegram ကို Join လုပ်ပါ'
+    };
+    await fs.writeFile(SETTINGS_FILE, JSON.stringify(defaults, null, 2));
+    console.log('📝 Created settings.json file');
   }
 }
 
@@ -223,6 +237,27 @@ async function initSectionsFile() {
 initBooksFile();
 initBlogsFile();
 initSectionsFile();
+initSettingsFile();
+
+async function getSettings() {
+  try {
+    const data = await fs.readFile(SETTINGS_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (error) {
+    console.error('Error reading settings:', error);
+    return {};
+  }
+}
+
+async function saveSettings(settings) {
+  try {
+    await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    throw error;
+  }
+}
 
 const B2_APPLICATION_KEY_ID =
   process.env.B2_APPLICATION_KEY_ID ||
@@ -902,6 +937,48 @@ function verifyAdminPassword(req, res, next) {
   
   next();
 }
+
+app.get('/api/settings/telegram', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const settings = await getSettings();
+    const telegramUrl = typeof settings.telegramUrl === 'string' ? settings.telegramUrl : '';
+    const telegramText = typeof settings.telegramText === 'string' ? settings.telegramText : '';
+    res.json({ telegramUrl, telegramText });
+  } catch (error) {
+    console.error('Error fetching telegram settings:', error);
+    res.status(500).json({ error: 'Failed to fetch telegram settings' });
+  }
+});
+
+app.put('/api/admin/settings/telegram', verifyAdminPassword, async (req, res) => {
+  try {
+    const { telegramUrl, telegramText } = req.body || {};
+
+    const nextUrl = typeof telegramUrl === 'string' ? telegramUrl.trim() : '';
+    const nextText = typeof telegramText === 'string' ? telegramText.trim() : '';
+
+    if (!nextUrl) {
+      return res.status(400).json({ error: 'telegramUrl is required' });
+    }
+    if (!nextText) {
+      return res.status(400).json({ error: 'telegramText is required' });
+    }
+
+    const current = await getSettings();
+    const updated = {
+      ...(current && typeof current === 'object' ? current : {}),
+      telegramUrl: nextUrl,
+      telegramText: nextText,
+      updatedAt: new Date().toISOString()
+    };
+    await saveSettings(updated);
+    res.json({ telegramUrl: updated.telegramUrl, telegramText: updated.telegramText });
+  } catch (error) {
+    console.error('Error saving telegram settings:', error);
+    res.status(500).json({ error: 'Failed to save telegram settings' });
+  }
+});
 
 app.get('/api/sections', async (req, res) => {
   try {

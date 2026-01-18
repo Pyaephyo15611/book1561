@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, BookOpen, Lock, Layers } from 'lucide-react';
-import { API_URL } from '../utils/apiConfig';
+import { API_URL, apiGet } from '../utils/apiConfig';
 import './Admin.css';
 
 const Admin = () => {
@@ -54,29 +54,55 @@ const Admin = () => {
     if (isAuthenticated) {
       fetchBooks();
       fetchSections();
-      try {
-        const saved = localStorage.getItem('app_settings_telegram_url');
-        setTelegramUrlSetting(saved || '');
-
-        const savedText = localStorage.getItem('app_settings_telegram_text');
-        setTelegramTextSetting(savedText || '');
-      } catch {
-        setTelegramUrlSetting('');
-        setTelegramTextSetting('');
-      }
+      (async () => {
+        try {
+          const resp = await apiGet('/api/settings/telegram');
+          setTelegramUrlSetting(resp?.data?.telegramUrl || '');
+          setTelegramTextSetting(resp?.data?.telegramText || '');
+        } catch {
+          setTelegramUrlSetting('');
+          setTelegramTextSetting('');
+        }
+      })();
     }
   }, [isAuthenticated]);
 
   const saveTelegramUrlSetting = () => {
-    try {
-      localStorage.setItem('app_settings_telegram_url', telegramUrlSetting.trim());
-      localStorage.setItem('app_settings_telegram_text', telegramTextSetting.trim());
-      window.dispatchEvent(new Event('telegramUrlUpdated'));
-      setSuccess('Telegram settings updated');
-      setError('');
-    } catch (e) {
-      setError(e?.message || 'Failed to save Telegram link');
-    }
+    (async () => {
+      try {
+        const response = await fetch(`${API_URL || ''}/api/admin/settings/telegram`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'x-admin-password': adminPassword
+          },
+          body: JSON.stringify({
+            telegramUrl: telegramUrlSetting,
+            telegramText: telegramTextSetting
+          })
+        });
+
+        if (!response.ok) {
+          let msg = `HTTP ${response.status}`;
+          try {
+            const ct = (response.headers.get('content-type') || '').toLowerCase();
+            if (ct.includes('application/json')) {
+              const j = await response.json();
+              msg = j.error || msg;
+            }
+          } catch {}
+          throw new Error(msg);
+        }
+
+        await response.json();
+        window.dispatchEvent(new Event('telegramUrlUpdated'));
+        setSuccess('Telegram settings updated');
+        setError('');
+      } catch (e) {
+        setError(e?.message || 'Failed to save Telegram settings');
+      }
+    })();
   };
 
   const fetchSections = async () => {
