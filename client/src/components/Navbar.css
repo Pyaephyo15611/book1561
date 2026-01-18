@@ -437,7 +437,11 @@
 
 @media (max-width: 420px) {
   .navbar-logo-text {
-    display: none;
+    display: inline;
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
