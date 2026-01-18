@@ -371,8 +371,13 @@ const Home = () => {
                   {darkMode ? <Sun className="icon" /> : <Moon className="icon" />}
                 </button>
               </div>
-              <button className="btn btn-outline" onClick={() => navigate('/login')}>
-                <LogIn className="icon" /> Sign In
+              <button
+                className="btn btn-outline"
+                onClick={() => navigate('/login')}
+                aria-label="Sign in"
+                title="Sign in"
+              >
+                <LogIn className="icon" />
               </button>
             </div>
           </div>
@@ -534,6 +539,16 @@ const Home = () => {
                       <div className="book-actions">
                         <button className="icon-btn" title="Add to favorites">
                           <Heart className="icon" />
+                        </button>
+                        <button
+                          className="icon-btn"
+                          title="Download"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleBookClick(book.id);
+                          }}
+                        >
+                          <Download className="icon" />
                         </button>
                       </div>
                     </div>

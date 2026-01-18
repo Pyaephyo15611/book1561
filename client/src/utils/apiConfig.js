@@ -28,12 +28,31 @@ const joinUrl = (base, path) => {
 
 export const apiGet = async (path, config = {}) => {
   const timeout = typeof config.timeout === 'number' ? config.timeout : DEFAULT_TIMEOUT_MS;
-  const bases = [API_URL, RENDER_FALLBACK_BASE].filter(Boolean);
+  const bases = (API_URL && API_URL.trim())
+    ? [API_URL, '', RENDER_FALLBACK_BASE]
+    : ['', RENDER_FALLBACK_BASE];
   let lastErr;
 
   for (const base of bases) {
     try {
-      return await axios.get(joinUrl(base, path), { ...config, timeout });
+      const resp = await axios.get(joinUrl(base, path), {
+        ...config,
+        timeout,
+        headers: {
+          Accept: 'application/json',
+          ...(config.headers || {})
+        }
+      });
+
+      // If we accidentally hit the frontend host (Netlify/Vercel) with a relative /api call,
+      // we may get back index.html (content-type text/html). In that case, fall back.
+      const contentType = String(resp?.headers?.['content-type'] || '').toLowerCase();
+      const looksLikeJson = contentType.includes('application/json') || typeof resp.data === 'object';
+      if (!looksLikeJson) {
+        throw new Error(`Non-JSON response from ${joinUrl(base, path)} (${contentType || 'unknown content-type'})`);
+      }
+
+      return resp;
     } catch (err) {
       lastErr = err;
     }

@@ -27,20 +27,25 @@ const CategorySection = ({ title, books, categoryRoute, loading, layout = 'scrol
         <div className="trending-header">
           <div
             className="trending-title"
-            onClick={() => navigate(`/category/${encodeURIComponent(categoryRoute)}`)}
-            style={{ cursor: 'pointer' }}
+            onClick={() => {
+              if (!categoryRoute) return;
+              navigate(`/category/${encodeURIComponent(categoryRoute)}`);
+            }}
+            style={{ cursor: categoryRoute ? 'pointer' : 'default' }}
           >
             <span>{title}</span>
-            <button
-              type="button"
-              className="trending-view"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/category/${encodeURIComponent(categoryRoute)}`);
-              }}
-            >
-              (အားလုံးကြည့်မယ်)
-            </button>
+            {categoryRoute ? (
+              <button
+                type="button"
+                className="trending-view"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/category/${encodeURIComponent(categoryRoute)}`);
+                }}
+              >
+                (အားလုံးကြည့်မယ်)
+              </button>
+            ) : null}
           </div>
 
           {!isGrid ? (
@@ -93,9 +98,11 @@ const CategorySection = ({ title, books, categoryRoute, loading, layout = 'scrol
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.03 }}
                   onClick={() =>
-                    isMobile
-                      ? navigate(`/category/${encodeURIComponent(categoryRoute)}`)
-                      : navigate(`/book/${book.id}`)
+                    !categoryRoute
+                      ? navigate(`/book/${book.id}`)
+                      : isMobile
+                        ? navigate(`/category/${encodeURIComponent(categoryRoute)}`)
+                        : navigate(`/book/${book.id}`)
                   }
                   style={{ cursor: 'pointer' }}
                 >

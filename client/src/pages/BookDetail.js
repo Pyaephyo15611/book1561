@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  doc,
-  getDoc,
   collection,
   addDoc,
   query,
@@ -10,7 +8,7 @@ import {
   onSnapshot,
   serverTimestamp
 } from 'firebase/firestore';
-import { db, auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
 import {
   ArrowLeft,
   Download,
@@ -20,7 +18,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { getCoverImageUrl } from '../utils/coverImage';
-import { apiGet, API_URL, RENDER_FALLBACK_BASE } from '../utils/apiConfig';
+import { apiGet, API_URL } from '../utils/apiConfig';
 import './BookDetail.css';
 
 const BookDetail = () => {
@@ -87,23 +85,9 @@ const BookDetail = () => {
 
   const fetchBook = useCallback(async () => {
     try {
-      try {
-        const response = await apiGet(`/api/books/${id}`);
-        setBook(response.data);
-        await fetchRecommendedBooks(response.data?.category);
-      } catch (apiError) {
-        try {
-          const bookRef = doc(db, 'books', id);
-          const bookSnap = await getDoc(bookRef);
-          if (bookSnap.exists()) {
-            const bookData = { id: bookSnap.id, ...bookSnap.data() };
-            setBook(bookData);
-            await fetchRecommendedBooks(bookData?.category);
-          }
-        } catch (fsError) {
-          throw apiError;
-        }
-      }
+      const response = await apiGet(`/api/books/${id}`);
+      setBook(response.data);
+      await fetchRecommendedBooks(response.data?.category);
   } catch (error) {
     console.error('Error fetching book:', error);
   } finally {
@@ -223,29 +207,61 @@ const BookDetail = () => {
 
   // PDF is now handled on /read/:id page
 
+  const hasSitePdf =
+    !!(book?.b2FileName || book?.fileName) ||
+    (Array.isArray(book?.pdfParts) && book.pdfParts.length > 0);
+
   const handleDownload = async () => {
+    if (!id) return;
     if (!auth.currentUser) {
-      alert('You need to sign in to download.');
-      navigate(`/login?reason=download&redirect=${encodeURIComponent(`/book/${id}`)}`);
+      navigate('/login');
       return;
     }
 
-    const shouldDownload = window.confirm('Download this book?');
-    if (!shouldDownload) return;
+    const ok = window.confirm('Do you want to download this book?');
+    if (!ok) return;
 
-    const hasWholePdf = !!(book && (book.b2FileName || book.fileName));
-    if (!hasWholePdf) {
-      alert('Download not available for this book. Please upload the full PDF in Admin.');
-      return;
-    }
-
-    const base = (API_URL && API_URL.trim()) ? API_URL.trim() : RENDER_FALLBACK_BASE;
-    const downloadUrl = `${String(base || '').replace(/\/$/, '')}/api/books/${id}/download`;
+    const url = `${API_URL || ''}/api/books/${encodeURIComponent(id)}/download`;
 
     setDownloading(true);
     try {
-      // Use the browser to handle the download stream (avoids Axios timeouts and huge memory usage).
-      window.location.assign(downloadUrl);
+      const token = await auth.currentUser.getIdToken();
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!resp.ok) {
+        if (resp.status === 401) {
+          navigate('/login');
+          return;
+        }
+        let msg = `HTTP ${resp.status}`;
+        try {
+          const ct = (resp.headers.get('content-type') || '').toLowerCase();
+          if (ct.includes('application/json')) {
+            const j = await resp.json();
+            msg = j.error || msg;
+          }
+        } catch {}
+        throw new Error(msg);
+      }
+
+      const blob = await resp.blob();
+      const cd = resp.headers.get('content-disposition') || '';
+      const match = cd.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)\"?/i);
+      const fileName = match ? decodeURIComponent(match[1]) : 'book.pdf';
+
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(blobUrl);
     } finally {
       // Allow the UI to re-enable quickly; the browser download continues independently.
       window.setTimeout(() => setDownloading(false), 750);
@@ -412,23 +428,25 @@ const BookDetail = () => {
             <span className="page-info">
               {book.title || 'Untitled'} · {book.author || 'Unknown Author'}
             </span>
-            <button
-              onClick={handleDownload}
-              className="action-btn"
-              disabled={downloading}
-            >
-              {downloading ? (
-                <>
-                  <Loader className="spinning" size={16} />
-                  Downloading…
-                </>
-              ) : (
-                <>
-                  <Download size={16} />
-                  Download
-                </>
-              )}
-            </button>
+            {hasSitePdf && (
+              <button
+                onClick={handleDownload}
+                className="action-btn"
+                disabled={downloading}
+              >
+                {downloading ? (
+                  <>
+                    <Loader className="spinning" size={16} />
+                    Opening…
+                  </>
+                ) : (
+                  <>
+                    <Download size={16} />
+                    Download
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -452,7 +470,6 @@ const BookDetail = () => {
           )}
 
             <div className="book-badge-row">
-              <span className="badge badge-free">Free Download</span>
               {book.category && (
                 <span className="badge badge-category">
                   {book.category}
@@ -566,26 +583,21 @@ const BookDetail = () => {
             </div>
 
             <div className="cta-row">
-              <button className="cta cta-download" onClick={handleDownload} disabled={downloading}>
-                {downloading ? (
-                  <>
-                    <Loader className="spinning" size={18} />
-                    Downloading…
-                  </>
-                ) : (
-                  <>
-                    <Download size={18} />
-                    Free Download
-                  </>
-                )}
-              </button>
-                          </div>
-
-            <div className="availability-note">
-              <Info size={16} />
-              <p>
-                This book is available for free download in PDF format.
-              </p>
+              {hasSitePdf && (
+                <button className="cta cta-download" onClick={handleDownload} disabled={downloading}>
+                  {downloading ? (
+                    <>
+                      <Loader className="spinning" size={18} />
+                      Opening…
+                    </>
+                  ) : (
+                    <>
+                      <Download size={18} />
+                      Download
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             {book.description && (

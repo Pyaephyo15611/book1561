@@ -21,6 +21,22 @@
   object-fit: cover;
 }
 
+.cat-title-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 18px;
+  padding: 0 2px;
+}
+
+.cat-title {
+  margin: 0;
+  color: var(--bs-text);
+  font-size: 1.6rem;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
 .cat-filters {
   display: inline-flex;
   align-items: center;
@@ -149,6 +165,10 @@
   .cat-grid { grid-template-columns: repeat(3, 160px); }
 }
 @media (max-width: 768px) {
+  .cat-title {
+    font-size: 1.35rem;
+  }
+
   .cat-grid {
     grid-template-columns: 1fr;
     gap: 16px;

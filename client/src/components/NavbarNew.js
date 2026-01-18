@@ -53,8 +53,14 @@ const Navbar = ({ user, darkMode, onToggleDarkMode }) => {
                 <User className="icon" /> Profile
               </Link>
             ) : (
-              <Link to="/login" className="btn btn-outline" onClick={closeMenu}>
-                <LogIn className="icon" /> Sign In
+              <Link
+                to="/login"
+                className="btn btn-outline"
+                onClick={closeMenu}
+                aria-label="Sign in"
+                title="Sign in"
+              >
+                <LogIn className="icon" />
               </Link>
             )}
           </div>

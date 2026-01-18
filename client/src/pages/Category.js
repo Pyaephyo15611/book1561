@@ -131,6 +131,10 @@ const Category = () => {
               </div>
             ) : null}
 
+            <div className="cat-title-section">
+              <h2 className="cat-title">{displayCategoryName}</h2>
+            </div>
+
             {loading ? (
               <div className="no-results">
                 <div className="loader" />

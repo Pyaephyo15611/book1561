@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
+import { Send } from 'lucide-react';
 import { auth, db } from './firebase/config';
 import { doc, getDoc } from 'firebase/firestore/lite';
 import Navbar from './components/Navbar';
@@ -18,6 +19,55 @@ import './App.css';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [telegramUrl, setTelegramUrl] = useState('https://t.me/your_channel');
+  const [telegramText, setTelegramText] = useState('Telegram ကို Join လုပ်ပါ');
+
+  useEffect(() => {
+    const syncTelegramUrl = () => {
+      try {
+        const saved = localStorage.getItem('app_settings_telegram_url');
+        if (saved && typeof saved === 'string') {
+          setTelegramUrl(saved);
+        }
+
+        const savedText = localStorage.getItem('app_settings_telegram_text');
+        if (savedText && typeof savedText === 'string') {
+          setTelegramText(savedText);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    syncTelegramUrl();
+
+    const handleStorage = (e) => {
+      if (e.key === 'app_settings_telegram_url') {
+        syncTelegramUrl();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('telegramUrlUpdated', syncTelegramUrl);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('telegramUrlUpdated', syncTelegramUrl);
+    };
+  }, []);
+
+  const handleTelegramClick = async (e) => {
+    e.preventDefault();
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(telegramUrl);
+      }
+    } catch {
+      // ignore
+    }
+
+    window.open(telegramUrl, '_blank', 'noreferrer');
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -49,7 +99,7 @@ function App() {
         console.error('Error loading user profile:', error);
         setUser(firebaseUser);
       } finally {
-      setLoading(false);
+        setLoading(false);
       }
     });
 
@@ -72,6 +122,13 @@ function App() {
     >
       <div className="App">
         <Navbar user={user} />
+        <div className="telegram-global-wrap">
+          <div className="container">
+            <a className="telegram-global" href={telegramUrl} onClick={handleTelegramClick} rel="noreferrer">
+              <span className="telegram-global-text">{telegramText}</span>
+            </a>
+          </div>
+        </div>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/book/:id" element={<BookDetail />} />

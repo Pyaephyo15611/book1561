@@ -41,6 +41,54 @@ h1, h2, h3, h4, h5, h6 {
   min-height: 100vh;
 }
 
+/* Global Sticky Full-width Telegram Bar Styles */
+.telegram-global-wrap {
+  position: sticky;
+  top: 4rem;
+  z-index: 9999;
+  width: 100%;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--bs-border);
+}
+
+.telegram-global {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0.8rem 0;
+  color: var(--bs-text);
+  text-decoration: none;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+}
+
+.telegram-global:hover {
+  color: var(--bs-text);
+}
+
+.telegram-global-text {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--bs-text);
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .telegram-global-wrap {
+    top: 3.5rem;
+  }
+
+  .telegram-global {
+    padding: 0.45rem 0;
+  }
+
+  .telegram-global-text {
+    font-size: 0.95rem;
+  }
+}
+
 /* Loading Spinner */
 .loader {
   width: 50px;

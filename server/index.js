@@ -9,8 +9,46 @@ const path = require('path');
 const axios = require('axios');
 const archiver = require('archiver');
 const { PDFDocument } = require('pdf-lib');
+const admin = require('firebase-admin');
 
 dotenv.config();
+
+// Firebase Admin (for verifying Firebase Auth ID tokens)
+// Configure one of:
+// - FIREBASE_SERVICE_ACCOUNT_JSON: JSON string of service account credentials
+// - GOOGLE_APPLICATION_CREDENTIALS: path to service account JSON file
+let firebaseAdminReady = false;
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    const svc = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    admin.initializeApp({ credential: admin.credential.cert(svc) });
+    firebaseAdminReady = true;
+    console.log('✅ Firebase Admin initialized (service account JSON)');
+  } else {
+    admin.initializeApp({ credential: admin.credential.applicationDefault() });
+    firebaseAdminReady = true;
+    console.log('✅ Firebase Admin initialized (application default credentials)');
+  }
+} catch (e) {
+  console.warn('⚠️  Firebase Admin not configured. Downloads will require server auth config:', e.message);
+}
+
+async function requireFirebaseAuth(req, res, next) {
+  if (!firebaseAdminReady) {
+    return res.status(500).json({ error: 'Server auth not configured' });
+  }
+  const hdr = req.headers.authorization || '';
+  const m = hdr.match(/^Bearer\s+(.+)$/i);
+  if (!m) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    req.user = await admin.auth().verifyIdToken(m[1]);
+    return next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -1676,7 +1714,7 @@ app.patch('/api/admin/books/:id/trending', verifyAdminPassword, async (req, res)
 });
 
 // Download PDF endpoint - serves file directly with download headers
-app.get('/api/books/:id/download', async (req, res) => {
+app.get('/api/books/:id/download', requireFirebaseAuth, async (req, res) => {
   console.log('📥 Download request for book ID:', req.params.id);
   
   // Set CORS headers

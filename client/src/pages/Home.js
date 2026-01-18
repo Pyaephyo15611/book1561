@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
-import { collection, getDocs } from 'firebase/firestore/lite';
-import { db } from '../firebase/config';
 import { API_URL, apiGet } from '../utils/apiConfig';
 import {
   Facebook,
   Instagram,
+  Send,
   Twitter,
   Youtube
 } from 'lucide-react';
@@ -20,6 +19,8 @@ const Home = () => {
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const telegramUrl = 'https://t.me/your_channel';
+  const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const defaultCategorySections = [
     {
       title: 'တာရာပွကြီး',
@@ -88,22 +89,7 @@ const Home = () => {
         booksData = Array.isArray(response.data) ? response.data : [];
         console.log('API fetch successful, got', booksData.length, 'books');
       } catch (apiError) {
-        console.log('API not available, trying Firestore fallback:', apiError.message);
-
-        // Always try Firestore fallback when API fails
-        try {
-          console.log('Fetching books from Firestore...');
-          const snapshot = await getDocs(collection(db, 'books'));
-          snapshot.forEach((doc) => {
-            booksData.push({
-              id: doc.id,
-              ...doc.data()
-            });
-          });
-          console.log('Firestore fetch successful, got', booksData.length, 'books');
-        } catch (fsErr) {
-          console.error('Firestore fallback failed:', fsErr.message);
-        }
+        console.error('API fetch failed (books are stored in server/books.json):', apiError.message || apiError);
       }
 
       if (booksData.length === 0) {
@@ -228,23 +214,50 @@ const Home = () => {
       .toLowerCase();
   };
 
-  const matchBookToExactCategoryRoute = (book, categoryRoute) => {
-    return normalizeCategory(book?.category) === normalizeCategory(categoryRoute);
+  const normalizeLoose = (value) => {
+    return normalizeCategory(value).replace(/\s+/g, '');
   };
 
-  
-  const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const matchBookToSection = (book, section) => {
+    const bookCat = normalizeCategory(book?.category);
+    const bookCatLoose = normalizeLoose(book?.category);
+    const route = normalizeCategory(section?.route);
+    const routeLoose = normalizeLoose(section?.route);
+    const title = normalizeCategory(section?.title);
+    const titleLoose = normalizeLoose(section?.title);
+
+    if (!bookCat) return false;
+
+    if (bookCat === route || bookCat === title) return true;
+    if (route && (bookCat.includes(route) || route.includes(bookCat))) return true;
+    if (title && (bookCat.includes(title) || title.includes(bookCat))) return true;
+
+    if (bookCatLoose && (bookCatLoose === routeLoose || bookCatLoose === titleLoose)) return true;
+    if (routeLoose && (bookCatLoose.includes(routeLoose) || routeLoose.includes(bookCatLoose))) return true;
+    if (titleLoose && (bookCatLoose.includes(titleLoose) || titleLoose.includes(bookCatLoose))) return true;
+
+    const keywords = Array.isArray(section?.keywords) ? section.keywords : [];
+    const matchedKeyword = keywords.some((k) => {
+      const key = normalizeCategory(k);
+      const keyLoose = normalizeLoose(k);
+      if (!key) return false;
+      if (bookCat.includes(key) || key.includes(bookCat)) return true;
+      if (bookCatLoose && keyLoose && (bookCatLoose.includes(keyLoose) || keyLoose.includes(bookCatLoose))) return true;
+      return false;
+    });
+    return matchedKeyword;
+  };
 
   // Structured Data for Homepage
   const homepageStructuredData = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Digitalcomic.site",
-    "url": siteUrl,
+    "url": "https://digitalcomic.site",
     "description": "Free online bookstore with thousands of ebooks. Read and download books online.",
     "potentialAction": {
       "@type": "SearchAction",
-      "target": `${siteUrl}/search/{search_term_string}`,
+      "target": "https://digitalcomic.site/search/{search_term_string}",
       "query-input": "required name=search_term_string"
     }
   };
@@ -267,7 +280,7 @@ const Home = () => {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Digitalcomic.site" />
         <meta name="twitter:description" content="Discover thousands of free ebooks and digital books." />
-        
+
         {/* Structured Data */}
         <script type="application/ld+json">
           {JSON.stringify(homepageStructuredData)}
@@ -328,14 +341,7 @@ const Home = () => {
         <>
           {categorySections.map((category) => {
             const categoryBooks = displayBooks.filter((book) => {
-              if (
-                matchBookToExactCategoryRoute(book, category?.route) ||
-                matchBookToExactCategoryRoute(book, category?.title)
-              ) {
-                return true;
-              }
-
-              return false;
+              return matchBookToSection(book, category);
             });
             
             // Hide empty sections after loading.
@@ -372,4 +378,3 @@ const Home = () => {
 };
 
 export default Home;
-

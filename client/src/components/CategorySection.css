@@ -92,11 +92,16 @@
 }
 
 .trending-card {
-  width: 150px;
-  flex: 0 0 150px;
+  width: 130px;
+  flex: 0 0 130px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.trending-books .trending-row .trending-card {
+  width: 130px;
+  flex: 0 0 130px;
 }
 
 .trending-cover {
@@ -125,13 +130,13 @@
 }
 
 .trending-book-title {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--bs-text);
 }
 
 .trending-book-author {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--bs-muted);
 }
 
@@ -150,14 +155,14 @@
   width: auto;
   flex: initial;
   display: grid;
-  grid-template-columns: 150px 1fr;
+  grid-template-columns: 130px 1fr;
   align-items: center;
   gap: 12px;
 }
 
 .trending-grid .trending-cover {
-  width: 150px;
-  height: 210px;
+  width: 130px;
+  height: 182px;
   padding-top: 0;
 }
 
@@ -186,6 +191,23 @@
   .trending-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+  
+  .trending-row {
+    gap: 16px;
+  }
+  
+  .trending-books .trending-row .trending-card {
+    width: 150px;
+    flex: 0 0 150px;
+  }
+  
+  .trending-book-title {
+    font-size: 1rem;
+  }
+  
+  .trending-book-author {
+    font-size: 0.92rem;
+  }
 }
 
 @media (max-width: 1023px) {
@@ -203,18 +225,27 @@
     font-size: 1.25rem;
   }
 
+  .trending-row {
+    gap: 10px;
+  }
+
   .trending-card {
-    width: 100px;
-    flex-basis: 100px;
-    gap: 8px;
+    width: calc((100vw - 3rem - 20px) / 2.5);
+    flex-basis: calc((100vw - 3rem - 20px) / 2.5);
+    gap: 7px;
+  }
+
+  .trending-books .trending-row .trending-card {
+    width: calc((100vw - 3rem - 20px) / 2.5);
+    flex: 0 0 calc((100vw - 3rem - 20px) / 2.5);
   }
 
   .trending-book-title {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
   }
 
   .trending-book-author {
-    font-size: 0.8rem;
+    font-size: 0.76rem;
   }
 
   .trending-grid .trending-card {
@@ -288,5 +319,30 @@
 
   .trending-books.is-grid .trending-view {
     display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .trending-row {
+    gap: 10px;
+  }
+
+  .trending-card {
+    width: calc((100vw - 2rem - 20px) / 2.5);
+    flex-basis: calc((100vw - 2rem - 20px) / 2.5);
+    gap: 6px;
+  }
+
+  .trending-books .trending-row .trending-card {
+    width: calc((100vw - 2rem - 20px) / 2.5);
+    flex: 0 0 calc((100vw - 2rem - 20px) / 2.5);
+  }
+
+  .trending-book-title {
+    font-size: 0.78rem;
+  }
+
+  .trending-book-author {
+    font-size: 0.72rem;
   }
 }

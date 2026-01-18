@@ -79,10 +79,16 @@
   width: 100%;
   display: flex;
   align-items: stretch;
+  gap: 0;
   border-radius: 999px;
   overflow: hidden;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.85);
   border: 1px solid var(--bs-border);
+}
+
+.amazon-search:focus-within {
+  border-color: var(--bs-border);
+  box-shadow: none;
 }
 
 .amazon-search-leading {
@@ -107,11 +113,22 @@
 .amazon-search-input {
   flex: 1;
   border: none;
-  outline: none;
+  outline: 0 !important;
+  outline-offset: 0 !important;
   padding: 0 12px;
   font-size: 0.95rem;
   color: var(--bs-text);
   min-width: 0;
+}
+
+.amazon-search-input:focus,
+.amazon-search-input:focus-visible {
+  border: none !important;
+  outline: 0 !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .amazon-search-input::placeholder {

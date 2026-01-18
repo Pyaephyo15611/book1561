@@ -30,6 +30,8 @@ const Admin = () => {
   const [editingId, setEditingId] = useState(null);
   const [listLoading, setListLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('books');
+  const [telegramUrlSetting, setTelegramUrlSetting] = useState('');
+  const [telegramTextSetting, setTelegramTextSetting] = useState('');
 
   const MAX_PDF_PARTS = 10;
 
@@ -52,8 +54,30 @@ const Admin = () => {
     if (isAuthenticated) {
       fetchBooks();
       fetchSections();
+      try {
+        const saved = localStorage.getItem('app_settings_telegram_url');
+        setTelegramUrlSetting(saved || '');
+
+        const savedText = localStorage.getItem('app_settings_telegram_text');
+        setTelegramTextSetting(savedText || '');
+      } catch {
+        setTelegramUrlSetting('');
+        setTelegramTextSetting('');
+      }
     }
   }, [isAuthenticated]);
+
+  const saveTelegramUrlSetting = () => {
+    try {
+      localStorage.setItem('app_settings_telegram_url', telegramUrlSetting.trim());
+      localStorage.setItem('app_settings_telegram_text', telegramTextSetting.trim());
+      window.dispatchEvent(new Event('telegramUrlUpdated'));
+      setSuccess('Telegram settings updated');
+      setError('');
+    } catch (e) {
+      setError(e?.message || 'Failed to save Telegram link');
+    }
+  };
 
   const fetchSections = async () => {
     try {
@@ -252,6 +276,7 @@ const Admin = () => {
       author: book.author || '',
       description: book.description || '',
       category: book.category || '',
+      telegramLink: book.telegramLink || '',
       coverFile: null,
       readingTime: book.readingTime || '',
       rating: book.rating || '',
@@ -340,12 +365,6 @@ const Admin = () => {
     if (!formData.title.trim()) errors.title = 'Title is required';
     if (!formData.author.trim()) errors.author = 'Author is required';
     if (!formData.category) errors.category = 'Category is required';
-
-    const hasSinglePdf = formData.pdf;
-
-    if (!hasSinglePdf && !editingId) {
-      errors.pdf = 'Upload the whole PDF file (required for download)';
-    }
     
     return errors;
   };
@@ -493,6 +512,14 @@ const Admin = () => {
           >
             <Layers size={20} />
             Sections
+          </button>
+          <button
+            type="button"
+            className={`admin-tab ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <Lock size={20} />
+            Settings
           </button>
         </div>
 
@@ -709,7 +736,7 @@ const Admin = () => {
                   accept=".pdf"
                   onChange={handlePdfFileChange}
                   className={`file-input ${fieldErrors.pdf ? 'error' : ''}`}
-                  required={!editingId}
+                  required={false}
                 />
                 <label htmlFor="pdf" className="file-label">
                   <Upload size={20} />
@@ -718,7 +745,7 @@ const Admin = () => {
               </div>
               {fieldErrors.pdf && <small className="field-error">{fieldErrors.pdf}</small>}
               <small className="form-hint">
-                Upload the whole PDF for download. If you also upload Parts below, Parts will be used for online reading.
+                Optional. You can leave this empty if you are only using Telegram links.
               </small>
             </div>
 
@@ -851,6 +878,61 @@ const Admin = () => {
             {books.length === 0 && <div className="empty-row">No books yet</div>}
           </div>
         )}
+          </>
+        )}
+
+        {activeTab === 'settings' && (
+          <>
+            <div className="admin-header">
+              <h1>
+                <Lock size={32} />
+                Settings
+              </h1>
+              <p>Update global app settings.</p>
+            </div>
+
+            {success && <div className="success-message">{success}</div>}
+            {error && <div className="error-message">{error}</div>}
+
+            <div className="admin-form">
+              <div className="form-grid">
+                <div className="form-group full-width">
+                  <label htmlFor="telegramUrl">Telegram Channel Link</label>
+                  <input
+                    id="telegramUrl"
+                    type="text"
+                    className="form-input"
+                    value={telegramUrlSetting}
+                    onChange={(e) => setTelegramUrlSetting(e.target.value)}
+                    placeholder="https://t.me/your_channel"
+                  />
+                  <small className="form-hint">
+                    This link is used by the sticky Telegram bar on all pages.
+                  </small>
+                </div>
+
+                <div className="form-group full-width">
+                  <label htmlFor="telegramText">Telegram Bar Text</label>
+                  <input
+                    id="telegramText"
+                    type="text"
+                    className="form-input"
+                    value={telegramTextSetting}
+                    onChange={(e) => setTelegramTextSetting(e.target.value)}
+                    placeholder="Telegram ကို Join လုပ်ပါ"
+                  />
+                  <small className="form-hint">
+                    This text will show in the sticky Telegram bar.
+                  </small>
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn-primary" onClick={saveTelegramUrlSetting}>
+                  Save
+                </button>
+              </div>
+            </div>
           </>
         )}
 

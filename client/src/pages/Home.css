@@ -477,6 +477,26 @@ a:hover {
   overflow: hidden;
 }
 
+.search-input-container input {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search-input-container input:focus {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.search-input-container input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .search-input {
   flex: 1;
   padding: 1rem 1.5rem;

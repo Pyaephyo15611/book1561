@@ -98,6 +98,17 @@
   transition: all 0.2s;
 }
 
+.book-detail .action-btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.82rem;
+  gap: 0.4rem;
+}
+
+.book-detail .action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .action-btn:hover {
   background-color: var(--bg-secondary);
 }
@@ -105,6 +116,30 @@
 .action-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 1024px) {
+  .book-nav .container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .nav-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .nav-actions .page-info {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* Book overview layout */
@@ -122,7 +157,7 @@
 }
 
 .book-sidebar {
-  width: 260px;
+  width: clamp(190px, 22vw, 240px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -136,8 +171,7 @@
   box-shadow: var(--shadow-lg);
   aspect-ratio: 2/3;
   width: 100%;
-  min-width: 220px;
-  min-height: 320px;
+  max-width: 240px;
   background-color: var(--bg-secondary);
   display: block;
 }
@@ -337,11 +371,13 @@
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .cta {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.85rem 1.75rem;
   border-radius: 4px;
@@ -350,12 +386,25 @@
   cursor: pointer;
   font-size: 1rem;
   transition: var(--transition);
+  width: 100%;
+}
+
+.book-detail .cta-download {
+  padding: 0.6rem 1.1rem;
+  font-size: 0.9rem;
+  gap: 0.4rem;
+}
+
+.book-detail .cta-download svg {
+  width: 16px;
+  height: 16px;
 }
 
 .cta-download {
   background-color: #0fb8ad;
   color: white;
   border-color: #0fb8ad;
+  width: 100%;
 }
 
 .cta-download:disabled {
@@ -1140,9 +1189,24 @@
     flex-direction: column;
   }
 
+  .cta-row {
+    flex-direction: column;
+  }
+
+  .cta-row .cta {
+    width: 100%;
+    flex: 0 0 100%;
+  }
+
   .book-sidebar {
     width: 100%;
-    max-width: 320px;
+    max-width: 260px;
+    margin: 0 auto;
+  }
+
+  .book-cover-container {
+    max-width: 220px;
+    margin: 0 auto;
   }
 }
 
