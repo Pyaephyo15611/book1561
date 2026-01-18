@@ -5,7 +5,6 @@ import { API_URL, apiGet } from '../utils/apiConfig';
 import {
   Facebook,
   Instagram,
-  Send,
   Twitter,
   Youtube
 } from 'lucide-react';
@@ -19,7 +18,6 @@ const Home = () => {
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const telegramUrl = 'https://t.me/your_channel';
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const defaultCategorySections = [
     {

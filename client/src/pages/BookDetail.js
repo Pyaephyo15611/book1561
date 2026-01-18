@@ -14,7 +14,6 @@ import {
   Download,
   Loader,
   Star,
-  Info,
   ChevronRight
 } from 'lucide-react';
 import { getCoverImageUrl } from '../utils/coverImage';
@@ -251,7 +250,7 @@ const BookDetail = () => {
 
       const blob = await resp.blob();
       const cd = resp.headers.get('content-disposition') || '';
-      const match = cd.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)\"?/i);
+      const match = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)"?/i);
       const fileName = match ? decodeURIComponent(match[1]) : 'book.pdf';
 
       const blobUrl = window.URL.createObjectURL(blob);
