@@ -112,7 +112,7 @@ const Navbar = ({ user }) => {
       <div className="navbar-container">
         <Link to="/" className="navbar-logo">
           <img src={logo} alt="Digitalcomic.site logo" className="navbar-logo-img" />
-          <span className="navbar-logo-text">Digitalcomic.site</span>
+          <span className="navbar-logo-text">Digitalcomic</span>
         </Link>
 
         <div className="navbar-search">

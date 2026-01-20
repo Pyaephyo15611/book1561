@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Upload, BookOpen, Lock, Layers } from 'lucide-react';
-import { API_URL, apiGet } from '../utils/apiConfig';
+import { Upload, BookOpen, Layers, BarChart2, Lock } from 'lucide-react';
+import { API_URL } from '../utils/apiConfig';
 import './Admin.css';
 
 const Admin = () => {
@@ -30,8 +30,6 @@ const Admin = () => {
   const [editingId, setEditingId] = useState(null);
   const [listLoading, setListLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('books');
-  const [telegramUrlSetting, setTelegramUrlSetting] = useState('');
-  const [telegramTextSetting, setTelegramTextSetting] = useState('');
 
   const MAX_PDF_PARTS = 10;
 
@@ -54,56 +52,8 @@ const Admin = () => {
     if (isAuthenticated) {
       fetchBooks();
       fetchSections();
-      (async () => {
-        try {
-          const resp = await apiGet('/api/settings/telegram');
-          setTelegramUrlSetting(resp?.data?.telegramUrl || '');
-          setTelegramTextSetting(resp?.data?.telegramText || '');
-        } catch {
-          setTelegramUrlSetting('');
-          setTelegramTextSetting('');
-        }
-      })();
     }
   }, [isAuthenticated]);
-
-  const saveTelegramUrlSetting = () => {
-    (async () => {
-      try {
-        const response = await fetch(`${API_URL || ''}/api/admin/settings/telegram`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'x-admin-password': adminPassword
-          },
-          body: JSON.stringify({
-            telegramUrl: telegramUrlSetting,
-            telegramText: telegramTextSetting
-          })
-        });
-
-        if (!response.ok) {
-          let msg = `HTTP ${response.status}`;
-          try {
-            const ct = (response.headers.get('content-type') || '').toLowerCase();
-            if (ct.includes('application/json')) {
-              const j = await response.json();
-              msg = j.error || msg;
-            }
-          } catch {}
-          throw new Error(msg);
-        }
-
-        await response.json();
-        window.dispatchEvent(new Event('telegramUrlUpdated'));
-        setSuccess('Telegram settings updated');
-        setError('');
-      } catch (e) {
-        setError(e?.message || 'Failed to save Telegram settings');
-      }
-    })();
-  };
 
   const fetchSections = async () => {
     try {
@@ -541,11 +491,11 @@ const Admin = () => {
           </button>
           <button
             type="button"
-            className={`admin-tab ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
+            className={`admin-tab ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => setActiveTab('analytics')}
           >
-            <Lock size={20} />
-            Settings
+            <BarChart2 size={20} />
+            Analytics
           </button>
         </div>
 
@@ -907,55 +857,24 @@ const Admin = () => {
           </>
         )}
 
-        {activeTab === 'settings' && (
+        {activeTab === 'analytics' && (
           <>
             <div className="admin-header">
               <h1>
-                <Lock size={32} />
-                Settings
+                <BarChart2 size={32} />
+                Analytics
               </h1>
-              <p>Update global app settings.</p>
+              <p>View your website visits in Google Analytics (GA4).</p>
             </div>
 
-            {success && <div className="success-message">{success}</div>}
-            {error && <div className="error-message">{error}</div>}
-
             <div className="admin-form">
-              <div className="form-grid">
-                <div className="form-group full-width">
-                  <label htmlFor="telegramUrl">Telegram Channel Link</label>
-                  <input
-                    id="telegramUrl"
-                    type="text"
-                    className="form-input"
-                    value={telegramUrlSetting}
-                    onChange={(e) => setTelegramUrlSetting(e.target.value)}
-                    placeholder="https://t.me/your_channel"
-                  />
-                  <small className="form-hint">
-                    This link is used by the sticky Telegram bar on all pages.
-                  </small>
-                </div>
-
-                <div className="form-group full-width">
-                  <label htmlFor="telegramText">Telegram Bar Text</label>
-                  <input
-                    id="telegramText"
-                    type="text"
-                    className="form-input"
-                    value={telegramTextSetting}
-                    onChange={(e) => setTelegramTextSetting(e.target.value)}
-                    placeholder="Telegram ကို Join လုပ်ပါ"
-                  />
-                  <small className="form-hint">
-                    This text will show in the sticky Telegram bar.
-                  </small>
-                </div>
-              </div>
-
               <div className="form-actions">
-                <button type="button" className="btn-primary" onClick={saveTelegramUrlSetting}>
-                  Save
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => window.open('https://analytics.google.com/analytics/web/', '_blank', 'noreferrer')}
+                >
+                  Open Google Analytics
                 </button>
               </div>
             </div>

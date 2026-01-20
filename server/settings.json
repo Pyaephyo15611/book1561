@@ -1,0 +1,13 @@
+{
+  "telegramUrl": "https://t.me/your_channel",
+  "telegramText": "Telegram ကို Join လုပ်ပါ",
+  "promo": {
+    "enabled": true,
+    "badgeText": "FEATURED TITLE",
+    "title": "Alice Feeney's new thriller is here",
+    "description": "My Husband's Wife is a psychological masterpiece that will leave you questioning everything you know about love, identity, and revenge.",
+    "imageUrl": "",
+    "buttonText": "ADD TO CART",
+    "linkUrl": "/"
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from './firebase/config';
 import { doc, getDoc } from 'firebase/firestore/lite';
@@ -11,47 +11,31 @@ import Login from './pages/Login';
 import Admin from './pages/Admin';
 import Category from './pages/Category';
 import Search from './pages/Search';
-import { apiGet } from './utils/apiConfig';
 import './App.css';
+
+function AnalyticsTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const gtag = window.gtag;
+    if (typeof gtag !== 'function') return;
+
+    const pagePath = `${location.pathname}${location.search || ''}${location.hash || ''}`;
+    gtag('event', 'page_view', {
+      page_path: pagePath,
+      page_location: window.location.href,
+      page_title: document.title
+    });
+  }, [location]);
+
+  return null;
+}
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [telegramUrl, setTelegramUrl] = useState('https://t.me/your_channel');
-  const [telegramText, setTelegramText] = useState('Telegram ကို Join လုပ်ပါ');
-
-  useEffect(() => {
-    const syncTelegramSettings = async () => {
-      try {
-        const resp = await apiGet('/api/settings/telegram', {
-          params: { _ts: Date.now() }
-        });
-        const nextUrl = resp?.data?.telegramUrl;
-        const nextText = resp?.data?.telegramText;
-        if (typeof nextUrl === 'string' && nextUrl.trim()) {
-          setTelegramUrl(nextUrl.trim());
-        }
-        if (typeof nextText === 'string' && nextText.trim()) {
-          setTelegramText(nextText.trim());
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    syncTelegramSettings();
-
-    const handleUpdated = () => {
-      syncTelegramSettings();
-    };
-
-    window.addEventListener('telegramUrlUpdated', handleUpdated);
-    window.addEventListener('focus', handleUpdated);
-    return () => {
-      window.removeEventListener('telegramUrlUpdated', handleUpdated);
-      window.removeEventListener('focus', handleUpdated);
-    };
-  }, []);
+  const telegramUrl = 'https://t.me/digitalcomicsite';
+  const telegramText = 'downloadလုပ်ရတာအဆင်မပြေတဲ့သူများ telegramမှာအလွယ်တကူဖတ်ရန်';
 
   const handleTelegramClick = async (e) => {
     e.preventDefault();
@@ -118,6 +102,7 @@ function App() {
         v7_startTransition: true,
       }}
     >
+      <AnalyticsTracker />
       <div className="App">
         <Navbar user={user} />
         <div className="telegram-global-wrap">

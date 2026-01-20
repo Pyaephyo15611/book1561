@@ -62,7 +62,7 @@ h1, h2, h3, h4, h5, h6 {
   cursor: pointer;
   width: 100%;
   justify-content: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .telegram-global:hover {
@@ -74,9 +74,9 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 1rem;
   color: var(--bs-text);
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
   max-width: 100%;
   min-width: 0;
 }
