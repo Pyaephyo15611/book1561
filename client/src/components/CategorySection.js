@@ -132,11 +132,8 @@ const CategorySection = ({ title, books, categoryRoute, loading, layout = 'scrol
                           navigate(`/category/${encodeURIComponent(categoryRoute)}`);
                           return;
                         }
-                        if (book.author) {
-                          navigate(`/author/${encodeURIComponent(book.author)}`);
-                        }
                       }}
-                      style={{ cursor: book.author ? 'pointer' : 'default' }}
+                      style={{ cursor: 'default' }}
                     >
                       {book.author || 'Unknown Author'}
                     </p>
@@ -178,11 +175,8 @@ const CategorySection = ({ title, books, categoryRoute, loading, layout = 'scrol
                       className="trending-book-author"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (book.author) {
-                          navigate(`/author/${encodeURIComponent(book.author)}`);
-                        }
                       }}
-                      style={{ cursor: book.author ? 'pointer' : 'default' }}
+                      style={{ cursor: 'default' }}
                     >
                       {book.author || 'Unknown Author'}
                     </p>

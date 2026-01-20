@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
+import { useNavigate } from 'react-router-dom';
 import { API_URL, apiGet } from '../utils/apiConfig';
 import {
   Facebook,
@@ -11,12 +12,38 @@ import {
 import CategorySection from '../components/CategorySection';
 import './Home.css';
 import bannerLogo from '../assets/logo.png';
+import promoImage from '../assets/lf (2).webp';
 
 console.log('API_URL configured as:', API_URL);
 
 const Home = () => {
   const [loading] = useState(false);
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const navigate = useNavigate();
+  const promo = {
+    enabled: true,
+    badgeText: 'FEATURED TITLE',
+    title: 'Dandadan manga(eng)',
+    description:
+      'အစမှဖတ် နောက်ဆုံးမှစဖတ်. Like Follow. အကျဉ်းချုပ်. သရဲတွေကိုမယုံတဲ့ကောင်လေးKen Takakuraနဲ့ aliensတွေကိုမယုံတဲ့ကောင်မလေး Momo Ayase..သူတိုရဲ့နားလည်မှုထက်သာလွန်တဲ့ထူးဆန်းမှုမျိုးကိုကြုံတွေ့လာရတဲ့အခါ',
+    imageUrl: promoImage,
+    linkUrl: 'https://t.me/digitalcomicsite'
+  };
+
+  const handlePromoNavigate = useCallback(
+    (url) => {
+      const next = String(url || '').trim();
+      if (!next) return;
+
+      if (/^https?:\/\//i.test(next)) {
+        window.open(next, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      navigate(next);
+    },
+    [navigate]
+  );
   const defaultCategorySections = [
     {
       title: 'တာရာပွကြီး',
@@ -273,6 +300,35 @@ const Home = () => {
           </div>
         </div>
       </header>
+
+      {promo?.enabled && (
+        <section className="promo-section">
+          <div className="container">
+            <div
+              className="promo-card"
+              role="link"
+              tabIndex={0}
+              onClick={() => handlePromoNavigate(promo.linkUrl)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handlePromoNavigate(promo.linkUrl);
+                }
+              }}
+            >
+              <div className="promo-media">
+                {promo.imageUrl && <img className="promo-image" src={promo.imageUrl} alt={promo.title || 'Promo'} />}
+                {promo.badgeText && <div className="promo-badge">{promo.badgeText}</div>}
+              </div>
+
+              <div className="promo-content">
+                {promo.title && <h2 className="promo-title">{promo.title}</h2>}
+                {promo.description && <p className="promo-description">{promo.description}</p>}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
     <main className="main-content">
       {/* Category Sections - Show filtered results when searching */}

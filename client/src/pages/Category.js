@@ -171,15 +171,14 @@ const Category = () => {
                     </div>
                     <div className="cat-meta">
                       <h3 className="cat-title-text">{book.title || 'Untitled'}</h3>
-                      <button
+                      <p
                         className="cat-author"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (book.author) navigate(`/author/${encodeURIComponent(book.author)}`);
                         }}
                       >
                         {book.author || 'Unknown Author'}
-                      </button>
+                      </p>
                     </div>
                   </div>
                   ))}

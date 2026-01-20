@@ -14,14 +14,14 @@
 
 .skeleton-cover {
   width: 100%;
-  height: 240px;
+  aspect-ratio: 2 / 3;
   background: #f0f0f0;
   position: relative;
   overflow: hidden;
 }
 
 .skeleton-info {
-  padding: 12px;
+  padding: clamp(10px, 2vw, 12px);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -46,6 +46,20 @@
   background: #e0e0e0;
   border-radius: 4px;
   width: 50%;
+}
+
+@media (max-width: 480px) {
+  .skeleton-title {
+    height: 14px;
+  }
+
+  .skeleton-author {
+    height: 12px;
+  }
+
+  .skeleton-meta {
+    height: 10px;
+  }
 }
 
 .skeleton-shimmer {

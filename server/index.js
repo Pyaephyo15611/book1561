@@ -88,6 +88,27 @@ const upload = multer({
   }
 });
 
+app.get('/api/settings/promo', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const settings = await getSettings();
+    const promo = settings && typeof settings === 'object' ? settings.promo : null;
+    const safe = promo && typeof promo === 'object' ? promo : {};
+    res.json({
+      enabled: Boolean(safe.enabled),
+      badgeText: typeof safe.badgeText === 'string' ? safe.badgeText : '',
+      title: typeof safe.title === 'string' ? safe.title : '',
+      description: typeof safe.description === 'string' ? safe.description : '',
+      imageUrl: typeof safe.imageUrl === 'string' ? safe.imageUrl : '',
+      buttonText: typeof safe.buttonText === 'string' ? safe.buttonText : '',
+      linkUrl: typeof safe.linkUrl === 'string' ? safe.linkUrl : ''
+    });
+  } catch (error) {
+    console.error('Error fetching promo settings:', error);
+    res.status(500).json({ error: 'Failed to fetch promo settings' });
+  }
+});
+
 // Simple admin password authentication
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
@@ -127,7 +148,17 @@ async function initSettingsFile() {
   } catch {
     const defaults = {
       telegramUrl: 'https://t.me/your_channel',
-      telegramText: 'Telegram ကို Join လုပ်ပါ'
+      telegramText: 'Telegram ကို Join လုပ်ပါ',
+      promo: {
+        enabled: true,
+        badgeText: 'FEATURED TITLE',
+        title: "Alice Feeney's new thriller is here",
+        description:
+          "My Husband's Wife is a psychological masterpiece that will leave you questioning everything you know about love, identity, and revenge.",
+        imageUrl: '',
+        buttonText: 'ADD TO CART',
+        linkUrl: '/'
+      }
     };
     await fs.writeFile(SETTINGS_FILE, JSON.stringify(defaults, null, 2));
     console.log('📝 Created settings.json file');

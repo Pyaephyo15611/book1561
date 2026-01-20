@@ -445,4 +445,9 @@
   }
 }
 
+ .dark .navbar-logo,
+ .dark .navbar-logo-text {
+   color: #f9fafb;
+ }
+
 

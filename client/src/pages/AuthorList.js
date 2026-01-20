@@ -78,8 +78,7 @@ const AuthorList = () => {
                   <div
                     key={index}
                     className="author-card"
-                    onClick={() => navigate(`/author/${encodeURIComponent(author.name)}`)}
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: 'default' }}
                   >
                     <div className="author-icon">
                       <User size={32} />

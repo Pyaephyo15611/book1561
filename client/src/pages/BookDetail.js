@@ -528,26 +528,9 @@ const BookDetail = () => {
             <div className="book-main">
             <div className="book-heading">
               <h1 className="book-title">{book.title || 'Untitled'}</h1>
-              <p className="book-author">
+              <p className="author">
                 By{' '}
-                {book.author ? (
-                  <button
-                    onClick={() => navigate(`/author/${encodeURIComponent(book.author)}`)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'inherit',
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      padding: 0,
-                      font: 'inherit'
-                    }}
-                  >
-                    {book.author}
-                  </button>
-                ) : (
-                  'Unknown Author'
-                )}
+                {book.author || 'Unknown'}
               </p>
               {/* Dynamic average rating from reviews */}
               <div className="book-rating">

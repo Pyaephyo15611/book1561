@@ -4,6 +4,7 @@
   "description": "Online bookstore with PDF reading and download capabilities",
   "main": "server/index.js",
   "scripts": {
+    "start": "npm start --prefix server",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "npm run dev --prefix server",
     "client": "npm start --prefix client",

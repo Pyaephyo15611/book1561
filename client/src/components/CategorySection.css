@@ -91,6 +91,11 @@
   padding: 0.25rem 0 0.75rem;
 }
 
+ .trending-row .book-skeleton {
+   width: 130px;
+   flex: 0 0 130px;
+ }
+
 .trending-card {
   width: 130px;
   flex: 0 0 130px;
@@ -151,6 +156,10 @@
   row-gap: 24px;
 }
 
+ .trending-grid .book-skeleton {
+   width: auto;
+ }
+
 .trending-grid .trending-card {
   width: auto;
   flex: initial;
@@ -200,6 +209,11 @@
     width: 150px;
     flex: 0 0 150px;
   }
+
+  .trending-books .trending-row .book-skeleton {
+    width: 150px;
+    flex: 0 0 150px;
+  }
   
   .trending-book-title {
     font-size: 1rem;
@@ -236,6 +250,11 @@
   }
 
   .trending-books .trending-row .trending-card {
+    width: calc((100vw - 3rem - 20px) / 2.5);
+    flex: 0 0 calc((100vw - 3rem - 20px) / 2.5);
+  }
+
+  .trending-books .trending-row .book-skeleton {
     width: calc((100vw - 3rem - 20px) / 2.5);
     flex: 0 0 calc((100vw - 3rem - 20px) / 2.5);
   }
@@ -334,6 +353,11 @@
   }
 
   .trending-books .trending-row .trending-card {
+    width: calc((100vw - 2rem - 20px) / 2.5);
+    flex: 0 0 calc((100vw - 2rem - 20px) / 2.5);
+  }
+
+  .trending-books .trending-row .book-skeleton {
     width: calc((100vw - 2rem - 20px) / 2.5);
     flex: 0 0 calc((100vw - 2rem - 20px) / 2.5);
   }
